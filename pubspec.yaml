@@ -1,0 +1,72 @@
+name: dart_oraculo
+description: App pessoal de RAG — oráculo de conhecimento via busca FTS5 e Claude API.
+version: 0.1.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Persistência
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0
+  path: ^1.8.0
+
+  # Segurança
+  flutter_secure_storage: ^9.0.0
+
+  # Auth local (biometria)
+  local_auth: ^2.1.0
+
+  # HTTP
+  http: ^1.2.0
+
+  # Extração de PDF
+  syncfusion_flutter_pdf: ^25.1.0
+
+  # File picker
+  file_picker: ^8.0.0
+
+  # Markdown rendering
+  flutter_markdown: ^0.7.0
+
+  # Utilidades
+  path_provider: ^2.1.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  mockito: ^5.4.0
+  build_runner: ^2.4.0
+  mocktail: ^1.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    # Display — serifada com caráter (placeholder, substituir pela fonte real)
+    - family: DisplayFont
+      fonts:
+        - asset: assets/fonts/display-regular.ttf
+        - asset: assets/fonts/display-bold.ttf
+          weight: 700
+
+    # Corpo — sans geométrica
+    - family: BodyFont
+      fonts:
+        - asset: assets/fonts/body-regular.ttf
+        - asset: assets/fonts/body-medium.ttf
+          weight: 500
+        - asset: assets/fonts/body-bold.ttf
+          weight: 700
+
+    # Técnica — monoespaçada
+    - family: TechFont
+      fonts:
+        - asset: assets/fonts/tech-regular.ttf
