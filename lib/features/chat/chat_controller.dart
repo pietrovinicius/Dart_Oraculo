@@ -1,0 +1,139 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/services/anthropic_service.dart';
+import '../../core/services/fts_service.dart';
+import 'models/conversation.dart';
+import 'models/message.dart';
+
+/// Controller principal do chat.
+/// Orquestra: pergunta → recuperação FTS5 → montagem de prompt → API → persistência.
+class ChatController extends ChangeNotifier {
+  ChatController({
+    required Database database,
+    required AnthropicService anthropicService,
+    required FtsService ftsService,
+  })  : _db = database,
+        _anthropicService = anthropicService,
+        _ftsService = ftsService;
+
+  final Database _db;
+  final AnthropicService _anthropicService;
+  final FtsService _ftsService;
+
+  /// Cria uma nova conversa.
+  Future<Conversation> createConversation({String? title}) async {
+    final now = DateTime.now();
+    final id = await _db.insert('conversations', {
+      'title': title,
+      'created_at': now.toIso8601String(),
+    });
+    return Conversation(id: id, title: title, createdAt: now);
+  }
+
+  /// Lista todas as conversas, mais recentes primeiro.
+  Future<List<Conversation>> listConversations() async {
+    final rows = await _db.query(
+      'conversations',
+      orderBy: 'created_at DESC',
+    );
+    return rows.map(Conversation.fromMap).toList();
+  }
+
+  /// Retorna mensagens de uma conversa, em ordem cronológica.
+  Future<List<Message>> getMessages(int conversationId) async {
+    final rows = await _db.query(
+      'messages',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(Message.fromMap).toList();
+  }
+
+  /// Faz uma pergunta: busca contexto via FTS5, chama API, retorna stream de tokens.
+  /// Persiste pergunta e resposta no banco.
+  Stream<String> askQuestion({
+    required int conversationId,
+    required String question,
+    required String model,
+  }) async* {
+    // 1. Busca chunks relevantes via FTS5
+    final ftsResults = await _ftsService.search(question);
+
+    // 2. Monta contexto a partir dos chunks recuperados
+    final contextBuffer = StringBuffer();
+    for (final result in ftsResults) {
+      contextBuffer.writeln(
+        '[${result.filename}, p.${result.page ?? "?"}]: ${result.content}',
+      );
+      contextBuffer.writeln();
+    }
+    final context = contextBuffer.toString();
+
+    // 3. Recupera histórico recente da conversa
+    final allMessages = await getMessages(conversationId);
+    final recentMessages = allMessages.length > AppConfig.maxHistoryMessages
+        ? allMessages.sublist(allMessages.length - AppConfig.maxHistoryMessages)
+        : allMessages;
+
+    final history = recentMessages.map((m) => {
+      'role': m.role,
+      'content': m.content,
+    }).toList();
+
+    // 4. Persiste mensagem do usuário
+    final now = DateTime.now();
+    await _db.insert('messages', {
+      'conversation_id': conversationId,
+      'role': 'user',
+      'content': question,
+      'model_used': null,
+      'chunks_used': null,
+      'created_at': now.toIso8601String(),
+    });
+
+    // 5. Chama API e acumula resposta
+    final responseBuffer = StringBuffer();
+    await for (final token in _anthropicService.sendMessage(
+      userMessage: question,
+      context: context,
+      history: history,
+      model: model,
+    )) {
+      responseBuffer.write(token);
+      yield token;
+    }
+
+    // 6. Persiste resposta do assistant
+    final chunkIds = ftsResults.map((r) => r.chunkId).toList();
+    await _db.insert('messages', {
+      'conversation_id': conversationId,
+      'role': 'assistant',
+      'content': responseBuffer.toString(),
+      'model_used': model,
+      'chunks_used': jsonEncode(chunkIds),
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    notifyListeners();
+  }
+
+  /// Deleta uma conversa e todas suas mensagens.
+  Future<void> deleteConversation(int conversationId) async {
+    await _db.delete(
+      'messages',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+    );
+    await _db.delete(
+      'conversations',
+      where: 'id = ?',
+      whereArgs: [conversationId],
+    );
+    notifyListeners();
+  }
+}
