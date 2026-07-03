@@ -1,9 +1,9 @@
 import 'package:dart_oraculo/core/theme/app_theme.dart';
+import 'package:dart_oraculo/features/chat/models/conversation.dart';
 import 'package:dart_oraculo/features/chat/widgets/chat_input.dart';
 import 'package:dart_oraculo/features/chat/widgets/citation_strip.dart';
 import 'package:dart_oraculo/features/chat/widgets/message_bubble.dart';
 import 'package:dart_oraculo/features/chat/widgets/sidebar.dart';
-import 'package:dart_oraculo/features/chat/models/conversation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
