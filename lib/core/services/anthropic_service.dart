@@ -132,7 +132,7 @@ class AnthropicService {
         Uri.parse(AppConfig.anthropicBaseUrl),
         headers: buildHeaders(),
         body: jsonEncode(body),
-      );
+      ).timeout(const Duration(seconds: 90));
 
       LoggerService.instance.info(_tag, 'response.statusCode=${response.statusCode}');
 
