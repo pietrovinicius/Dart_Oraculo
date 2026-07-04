@@ -126,6 +126,16 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _renameConversation(int id, String newTitle) async {
+    await _chatController?.renameConversation(id, newTitle);
+    await _refreshConversations();
+  }
+
+  Future<void> _togglePin(int id, bool pinned) async {
+    await _chatController?.togglePin(id, pinned);
+    await _refreshConversations();
+  }
+
   Future<void> _sendMessage(String text) async {
     if (_activeConversationId == null || _chatController == null) return;
 
@@ -265,6 +275,8 @@ class _ChatScreenState extends State<ChatScreen> {
               onConversationSelected: _loadMessages,
               onNewConversation: _createNewConversation,
               onDeleteConversation: _deleteConversation,
+              onRenameConversation: _renameConversation,
+              onTogglePin: _togglePin,
               documentCount: _documentCount,
               onOpenDocuments: _importDocument,
             ),

@@ -36,13 +36,37 @@ class ChatController extends ChangeNotifier {
     return Conversation(id: id, title: title, createdAt: now);
   }
 
-  /// Lista todas as conversas, mais recentes primeiro.
+  /// Lista todas as conversas — fixadas primeiro, depois por data.
   Future<List<Conversation>> listConversations() async {
     final rows = await _db.query(
       'conversations',
-      orderBy: 'created_at DESC',
+      orderBy: 'pinned DESC, created_at DESC',
     );
     return rows.map(Conversation.fromMap).toList();
+  }
+
+  /// Renomeia uma conversa.
+  Future<void> renameConversation(int id, String newTitle) async {
+    LoggerService.instance.info(_tag, 'renameConversation($id, "$newTitle")');
+    await _db.update(
+      'conversations',
+      {'title': newTitle},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    notifyListeners();
+  }
+
+  /// Fixa ou desfixa uma conversa.
+  Future<void> togglePin(int id, bool pinned) async {
+    LoggerService.instance.info(_tag, 'togglePin($id, pinned=$pinned)');
+    await _db.update(
+      'conversations',
+      {'pinned': pinned ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    notifyListeners();
   }
 
   /// Retorna mensagens de uma conversa, em ordem cronológica.

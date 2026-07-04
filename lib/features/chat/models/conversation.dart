@@ -4,17 +4,20 @@ class Conversation {
     this.id,
     required this.title,
     required this.createdAt,
+    this.pinned = false,
   });
 
   final int? id;
   final String? title;
   final DateTime createdAt;
+  final bool pinned;
 
   Map<String, dynamic> toMap() {
     return {
       if (id != null) 'id': id,
       'title': title,
       'created_at': createdAt.toIso8601String(),
+      'pinned': pinned ? 1 : 0,
     };
   }
 
@@ -22,5 +25,20 @@ class Conversation {
     id: map['id'] as int?,
     title: map['title'] as String?,
     createdAt: DateTime.parse(map['created_at'] as String),
+    pinned: (map['pinned'] as int? ?? 0) == 1,
   );
+
+  Conversation copyWith({
+    int? id,
+    String? title,
+    DateTime? createdAt,
+    bool? pinned,
+  }) {
+    return Conversation(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      createdAt: createdAt ?? this.createdAt,
+      pinned: pinned ?? this.pinned,
+    );
+  }
 }

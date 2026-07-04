@@ -13,6 +13,8 @@ class Sidebar extends StatelessWidget {
     required this.onConversationSelected,
     required this.onNewConversation,
     required this.onDeleteConversation,
+    required this.onRenameConversation,
+    required this.onTogglePin,
     required this.documentCount,
     required this.onOpenDocuments,
   });
@@ -22,6 +24,8 @@ class Sidebar extends StatelessWidget {
   final void Function(int id) onConversationSelected;
   final VoidCallback onNewConversation;
   final void Function(int id) onDeleteConversation;
+  final void Function(int id, String newTitle) onRenameConversation;
+  final void Function(int id, bool pinned) onTogglePin;
   final int documentCount;
   final VoidCallback onOpenDocuments;
 
@@ -64,6 +68,13 @@ class Sidebar extends StatelessWidget {
                       final conv = conversations[index];
                       final isSelected = conv.id == selectedConversationId;
                       return ListTile(
+                        leading: conv.pinned
+                            ? const Icon(
+                                Icons.push_pin,
+                                size: 16,
+                                color: AppColors.accentOrange,
+                              )
+                            : null,
                         title: Text(
                           conv.title ?? 'Sem título',
                           style: AppTextStyles.bodyMedium.copyWith(
@@ -77,10 +88,58 @@ class Sidebar extends StatelessWidget {
                         selected: isSelected,
                         selectedTileColor:
                             AppColors.accentOrange.withValues(alpha: 0.1),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          color: AppColors.textMuted,
-                          onPressed: () => onDeleteConversation(conv.id!),
+                        trailing: PopupMenuButton<String>(
+                          icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
+                          color: AppColors.surfaceLight,
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'rename',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.edit, size: 16, color: AppColors.textSecondary),
+                                  SizedBox(width: 8),
+                                  Text('Renomear', style: AppTextStyles.bodyMedium),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'pin',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    conv.pinned ? Icons.push_pin_outlined : Icons.push_pin,
+                                    size: 16,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    conv.pinned ? 'Desafixar' : 'Fixar',
+                                    style: AppTextStyles.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.delete_outline, size: 16, color: AppColors.error),
+                                  const SizedBox(width: 8),
+                                  Text('Excluir', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+                                ],
+                              ),
+                            ),
+                          ],
+                          onSelected: (action) {
+                            switch (action) {
+                              case 'rename':
+                                _showRenameDialog(context, conv);
+                              case 'pin':
+                                onTogglePin(conv.id!, !conv.pinned);
+                              case 'delete':
+                                onDeleteConversation(conv.id!);
+                            }
+                          },
                         ),
                         onTap: () => onConversationSelected(conv.id!),
                       );
@@ -101,6 +160,48 @@ class Sidebar extends StatelessWidget {
               onPressed: onOpenDocuments,
               tooltip: 'Importar documento',
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRenameDialog(BuildContext context, Conversation conv) {
+    final controller = TextEditingController(text: conv.title ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Renomear conversa', style: AppTextStyles.bodyLarge),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: AppTextStyles.bodyLarge,
+          decoration: const InputDecoration(
+            hintText: 'Nome da conversa',
+          ),
+          onSubmitted: (value) {
+            final trimmed = value.trim();
+            if (trimmed.isNotEmpty) {
+              onRenameConversation(conv.id!, trimmed);
+            }
+            Navigator.pop(ctx);
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () {
+              final trimmed = controller.text.trim();
+              if (trimmed.isNotEmpty) {
+                onRenameConversation(conv.id!, trimmed);
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Salvar', style: TextStyle(color: AppColors.accentOrange)),
           ),
         ],
       ),

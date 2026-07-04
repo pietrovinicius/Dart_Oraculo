@@ -56,6 +56,7 @@ class Migrations {
     CREATE TABLE IF NOT EXISTS conversations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT,
+      pinned INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
   ''';
