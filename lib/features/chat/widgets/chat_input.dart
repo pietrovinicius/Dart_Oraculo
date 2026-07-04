@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// Input de texto do chat com Shift+Enter para nova linha, Enter para enviar.
+/// Input de texto do chat com Enter para enviar, Shift+Enter para nova linha.
 /// Mostra botão Stop durante streaming.
 class ChatInput extends StatefulWidget {
   const ChatInput({
@@ -55,14 +55,9 @@ class _ChatInputState extends State<ChatInput> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: KeyboardListener(
-              focusNode: FocusNode(),
-              onKeyEvent: (event) {
-                if (event is KeyDownEvent &&
-                    event.logicalKey == LogicalKeyboardKey.enter &&
-                    !HardwareKeyboard.instance.isShiftPressed) {
-                  _handleSend();
-                }
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.enter): _handleSend,
               },
               child: TextField(
                 controller: _controller,
@@ -70,7 +65,7 @@ class _ChatInputState extends State<ChatInput> {
                 enabled: widget.enabled,
                 style: AppTextStyles.bodyLarge,
                 decoration: const InputDecoration(
-                  hintText: 'Pergunte ao Oráculo... (Shift+Enter para nova linha)',
+                  hintText: 'Pergunte ao Oráculo... (Shift+Enter nova linha)',
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 16,
