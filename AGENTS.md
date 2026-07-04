@@ -133,3 +133,19 @@ Este documento registra as decisões arquiteturais do Dart Oráculo com a justif
 **Decisão:** O pipeline de ingestão aceita arquivos `.md` além de `.pdf`. Para markdown, o conteúdo já está no formato final e vai direto para o chunking, sem passar pelo pdf_service nem pelo normalizer.
 
 **Razão:** A especificação sempre previu PDF e markdown como formatos de entrada. Markdown é o formato nativo de notas pessoais (Obsidian, Logseq, etc.), e o público-alvo do app provavelmente já tem uma base de conhecimento em markdown. Chunks de markdown recebem `page: null` no schema, já que o arquivo não tem conceito de página.
+
+---
+
+## ADR-015: Flag SKIP_AUTH para bypass de autenticação em debug
+
+**Decisão:** A flag `--dart-define=SKIP_AUTH=true` permite pular a tela de bloqueio biométrico em builds de debug. Valor padrão: `false`. Nunca deve ser habilitada em builds de Release.
+
+**Razão:** Testes automatizados e auditorias end-to-end não conseguem interagir com biometria (Touch ID/Face ID). O bypass permite exercitar o fluxo completo sem intervenção manual.
+
+**Risco de segurança:** Se acidentalmente habilitada em produção, qualquer pessoa com acesso físico ao dispositivo entra no app sem autenticação. Mitigações:
+1. Flag é `const` compilada — não existe em builds que não passam `--dart-define`
+2. Valor padrão é `false` — omitir a flag = auth normal
+3. Documentada aqui como risco controlado para auditoria
+4. Nunca deve aparecer em scripts de build de Release
+
+**Revisitar quando:** Testes automatizados com mock de `local_auth` permitirem bypass sem flag de compilação.

@@ -19,6 +19,10 @@ class _LockScreenState extends State<LockScreen> {
   String? _errorMessage;
   bool _authenticating = false;
 
+  /// Flag de compilação para bypass de auth em debug.
+  /// Usar: flutter run --dart-define=SKIP_AUTH=true
+  static const _skipAuth = bool.fromEnvironment('SKIP_AUTH');
+
   @override
   void initState() {
     super.initState();
@@ -26,6 +30,12 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _tryAuthenticate() async {
+    // Bypass para ambiente de desenvolvimento/teste automatizado
+    if (_skipAuth) {
+      _navigateHome();
+      return;
+    }
+
     final authService = widget.authService;
     if (authService == null) {
       _navigateHome();
