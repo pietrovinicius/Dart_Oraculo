@@ -29,6 +29,10 @@ doc/api/
 macos/Flutter/ephemeral/
 macos/Pods/
 
+# Dados de teste / corpus local (não commitar)
+jsons/
+pdfs/
+
 # Environment
 .env*
 
