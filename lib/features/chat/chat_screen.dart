@@ -163,6 +163,17 @@ class _ChatScreenState extends State<ChatScreen> {
           SnackBar(
             content: Text('Erro da API: ${e.message}'),
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro inesperado: $e'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

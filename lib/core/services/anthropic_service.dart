@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import 'logger_service.dart';
 
 /// Exceção para erros da API Anthropic.
 class AnthropicException implements Exception {
@@ -23,6 +24,7 @@ class AnthropicService {
   })  : _apiKey = apiKey,
         _httpClient = httpClient ?? http.Client();
 
+  static const _tag = 'AnthropicAPI';
   final String _apiKey;
   final http.Client _httpClient;
 
@@ -60,7 +62,6 @@ class AnthropicService {
   }
 
   /// Parseia um evento SSE do stream.
-  /// Retorna o texto delta ou null se não for um evento de texto.
   String? parseStreamEvent(String line) {
     if (line.isEmpty || !line.startsWith('data: ')) return null;
 
@@ -74,6 +75,27 @@ class AnthropicService {
         if (delta['type'] == 'text_delta') {
           return delta['text'] as String;
         }
+      }
+      // Log do modelo usado (aparece no message_start)
+      if (json['type'] == 'message_start') {
+        final message = json['message'] as Map<String, dynamic>?;
+        if (message != null) {
+          final modelUsed = message['model'] as String?;
+          final usage = message['usage'] as Map<String, dynamic>?;
+          LoggerService.instance.info(
+            _tag,
+            'message_start → model=$modelUsed, input_tokens=${usage?['input_tokens']}',
+          );
+        }
+      }
+      // Log de uso final (message_delta com stop_reason)
+      if (json['type'] == 'message_delta') {
+        final delta = json['delta'] as Map<String, dynamic>?;
+        final usage = json['usage'] as Map<String, dynamic>?;
+        LoggerService.instance.info(
+          _tag,
+          'message_delta → stop_reason=${delta?['stop_reason']}, output_tokens=${usage?['output_tokens']}',
+        );
       }
     } on FormatException {
       // Ignora linhas que não são JSON válido
@@ -89,6 +111,13 @@ class AnthropicService {
     required List<Map<String, String>> history,
     required String model,
   }) async* {
+    LoggerService.instance.info(_tag, 'sendMessage() → model=$model, apiKey=${_apiKey.length > 10 ? "${_apiKey.substring(0, 10)}..." : "[EMPTY]"}');
+
+    if (_apiKey.isEmpty) {
+      LoggerService.instance.error(_tag, 'API key está vazia! Configure em Configurações.');
+      throw const AnthropicException('API key não configurada', 0);
+    }
+
     final body = buildRequestBody(
       userMessage: userMessage,
       context: context,
@@ -96,30 +125,43 @@ class AnthropicService {
       model: model,
     );
 
-    final response = await _httpClient.post(
-      Uri.parse(AppConfig.anthropicBaseUrl),
-      headers: buildHeaders(),
-      body: jsonEncode(body),
-    );
+    LoggerService.instance.info(_tag, 'POST ${AppConfig.anthropicBaseUrl}');
 
-    if (response.statusCode != 200) {
-      String errorMessage;
-      try {
-        final errorJson = jsonDecode(response.body) as Map<String, dynamic>;
-        final error = errorJson['error'] as Map<String, dynamic>?;
-        errorMessage = error?['message'] as String? ?? response.body;
-      } on FormatException {
-        errorMessage = response.body;
-      }
-      throw AnthropicException(errorMessage, response.statusCode);
-    }
+    try {
+      final response = await _httpClient.post(
+        Uri.parse(AppConfig.anthropicBaseUrl),
+        headers: buildHeaders(),
+        body: jsonEncode(body),
+      );
 
-    final lines = response.body.split('\n');
-    for (final line in lines) {
-      final text = parseStreamEvent(line);
-      if (text != null) {
-        yield text;
+      LoggerService.instance.info(_tag, 'response.statusCode=${response.statusCode}');
+
+      if (response.statusCode != 200) {
+        String errorMessage;
+        try {
+          final errorJson = jsonDecode(response.body) as Map<String, dynamic>;
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          errorMessage = error?['message'] as String? ?? response.body;
+        } on FormatException {
+          errorMessage = response.body;
+        }
+        LoggerService.instance.error(_tag, 'API error: $errorMessage (status=${response.statusCode})');
+        throw AnthropicException(errorMessage, response.statusCode);
       }
+
+      final lines = response.body.split('\n');
+      for (final line in lines) {
+        final text = parseStreamEvent(line);
+        if (text != null) {
+          yield text;
+        }
+      }
+
+      LoggerService.instance.info(_tag, 'sendMessage() completo com sucesso');
+    } catch (e, stack) {
+      if (e is AnthropicException) rethrow;
+      LoggerService.instance.error(_tag, 'Erro de rede/conexão', e, stack);
+      throw AnthropicException('Erro de conexão: $e', 0);
     }
   }
 }
