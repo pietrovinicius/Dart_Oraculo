@@ -1,3 +1,4 @@
+import 'package:dart_oraculo/core/config/app_config.dart';
 import 'package:dart_oraculo/core/theme/app_theme.dart';
 import 'package:dart_oraculo/features/chat/models/conversation.dart';
 import 'package:dart_oraculo/features/chat/widgets/chat_input.dart';
@@ -209,6 +210,38 @@ void main() {
       );
 
       expect(find.text('v0.11.2'), findsOneWidget);
+      expect(find.text('Dev @PLima'), findsOneWidget);
+    });
+
+    testWidgets('rodapé usa AppConfig.appVersion como fallback quando versão vazia', (tester) async {
+      // Simula cenário onde PackageInfo.fromPlatform() falha → appVersion fica ''
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Sidebar(
+              collections: [Collection(id: 1, name: 'Geral', createdAt: DateTime.now())],
+              activeCollectionId: 1,
+              onCollectionChanged: (_) {},
+              onNewCollection: () {},
+              conversations: const [],
+              selectedConversationId: null,
+              onConversationSelected: (_) {},
+              onNewConversation: () {},
+              onDeleteConversation: (_) {},
+              onRenameConversation: (_, __) {},
+              onTogglePin: (_, __) {},
+              documentCount: 0,
+              onOpenDocuments: () {},
+              onOpenLibrary: () {},
+              appVersion: '', // fallback — PackageInfo falhou
+            ),
+          ),
+        ),
+      );
+
+      // Deve mostrar AppConfig.appVersion como fallback
+      expect(find.text('v${AppConfig.appVersion}'), findsOneWidget);
       expect(find.text('Dev @PLima'), findsOneWidget);
     });
   });
