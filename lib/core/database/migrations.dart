@@ -96,14 +96,20 @@ class Migrations {
     createMessages,
   ];
 
+  static const String addPinnedToConversations = '''
+    ALTER TABLE conversations ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;
+  ''';
+
   /// Migrations incrementais v1 → v2.
   static List<String> get upgradeV1toV2 => [
+    addPinnedToConversations,
     createMessageFeedback,
   ];
 
-  /// Fresh install completo (v2).
+  /// Fresh install completo (v2) — schema já inclui pinned em createConversations.
+  /// Não executa ALTER TABLE (só para upgrade de banco existente).
   static List<String> get allV2 => [
     ...allV1,
-    ...upgradeV1toV2,
+    createMessageFeedback,
   ];
 }

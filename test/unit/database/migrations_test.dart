@@ -248,36 +248,55 @@ void main() {
       );
     });
 
-    test('upgrade v1 → v2 cria message_feedback', () async {
-      // Simula DB v1
+    test('upgrade v1 → v2 adiciona pinned e message_feedback', () async {
+      // Schema v1 ORIGINAL (sem coluna pinned)
+      const originalCreateConversations = '''
+        CREATE TABLE IF NOT EXISTS conversations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT,
+          created_at TEXT NOT NULL
+        );
+      ''';
+
       final dbUpgrade = await databaseFactoryFfi.openDatabase(
         inMemoryDatabasePath,
         options: OpenDatabaseOptions(
           version: 1,
+          singleInstance: false,
           onCreate: (db, version) async {
-            for (final sql in Migrations.allV1) {
-              await db.execute(sql);
-            }
+            await db.execute(Migrations.createDocuments);
+            await db.execute(Migrations.createChunks);
+            await db.execute(Migrations.createChunksFts);
+            await db.execute(Migrations.triggerInsert);
+            await db.execute(Migrations.triggerDelete);
+            await db.execute(Migrations.triggerUpdate);
+            await db.execute(originalCreateConversations);
+            await db.execute(Migrations.createMessages);
           },
         ),
       );
 
-      // Verifica que message_feedback não existe em v1
+      // Verifica que pinned e message_feedback não existem em v1 original
       var tables = await dbUpgrade.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='message_feedback'",
       );
       expect(tables, isEmpty);
 
-      // Aplica upgrade
+      // Aplica upgrade v1→v2
       for (final sql in Migrations.upgradeV1toV2) {
         await dbUpgrade.execute(sql);
       }
 
-      // Agora existe
+      // message_feedback existe
       tables = await dbUpgrade.rawQuery(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='message_feedback'",
       );
       expect(tables, hasLength(1));
+
+      // pinned existe em conversations
+      final convInfo = await dbUpgrade.rawQuery('PRAGMA table_info(conversations)');
+      final hasPinned = convInfo.any((col) => col['name'] == 'pinned');
+      expect(hasPinned, isTrue);
 
       await dbUpgrade.close();
     });

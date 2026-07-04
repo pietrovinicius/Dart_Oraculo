@@ -33,8 +33,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _onControllerChanged() {
     if (mounted) setState(() {});
     if (!_controller.isLoading && _apiKeyController.text.isEmpty) {
-      _apiKeyController.text = _controller.apiKey;
+      // Mostrar apenas versão parcial da chave: primeiros 10 + ... + últimos 4
+      _apiKeyController.text = _maskApiKey(_controller.apiKey);
     }
+  }
+
+  String _maskApiKey(String key) {
+    if (key.isEmpty) return '';
+    if (key.length <= 14) return '••••••••';
+    return '${key.substring(0, 10)}${'•' * 8}${key.substring(key.length - 4)}';
   }
 
   @override
@@ -115,6 +122,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Digite uma chave antes de salvar.'),
+                          backgroundColor: AppColors.error,
+                        ),
+                      );
+                      return;
+                    }
+                    // Não salvar se é a versão mascarada (não editou)
+                    if (key.contains('••••')) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Limpe o campo e cole a nova chave.'),
                           backgroundColor: AppColors.error,
                         ),
                       );
