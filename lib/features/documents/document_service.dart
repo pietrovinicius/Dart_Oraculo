@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../core/services/chunking_service.dart';
+import '../../core/services/logger_service.dart';
 import '../../core/services/markdown_normalizer.dart';
 import '../../core/services/pdf_service.dart';
 import 'models/chunk.dart';
@@ -28,23 +29,26 @@ class DocumentService {
   final ChunkingService _chunkingService;
   final MarkdownNormalizer _normalizer;
 
+  static const _tag = 'DocumentService';
+
   /// Ingere um PDF: extrai texto → normaliza para markdown → fragmenta → persiste.
-  /// Retorna o [Document] criado com seu ID.
   Future<Document> ingestPdf({
     required Uint8List bytes,
     required String filename,
     String? sourcePath,
   }) async {
+    LoggerService.instance.info(_tag, 'ingestPdf("$filename", ${bytes.length} bytes)');
     final pages = await _pdfService.extractText(bytes);
+    LoggerService.instance.info(_tag, 'PDF extraído: ${pages.length} páginas');
 
-    // Normaliza texto bruto para markdown estruturado
     final markdown = _normalizer.normalize(pages);
+    LoggerService.instance.info(_tag, 'Normalizado para markdown: ${markdown.length} chars');
 
-    // Chunking sobre o markdown normalizado (tratado como página única)
     final markdownPages = [
       PdfPageResult(pageNumber: 1, text: markdown),
     ];
     final textChunks = _chunkingService.chunkPages(markdownPages);
+    LoggerService.instance.info(_tag, 'Chunking: ${textChunks.length} chunks gerados');
 
     return _persistDocument(
       filename: filename,
@@ -54,12 +58,12 @@ class DocumentService {
   }
 
   /// Ingere um arquivo Markdown: conteúdo já no formato final → chunking direto.
-  /// Retorna o [Document] criado com seu ID.
   Future<Document> ingestMarkdown({
     required Uint8List bytes,
     required String filename,
     String? sourcePath,
   }) async {
+    LoggerService.instance.info(_tag, 'ingestMarkdown("$filename", ${bytes.length} bytes)');
     final content = utf8.decode(bytes);
 
     // Markdown já está no formato final — chunking direto com page null

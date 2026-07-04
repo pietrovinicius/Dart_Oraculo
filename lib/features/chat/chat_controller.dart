@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/fts_service.dart';
+import '../../core/services/logger_service.dart';
 import 'models/conversation.dart';
 import 'models/message.dart';
 
@@ -20,12 +21,13 @@ class ChatController extends ChangeNotifier {
         _anthropicService = anthropicService,
         _ftsService = ftsService;
 
+  static const _tag = 'ChatController';
   final Database _db;
   final AnthropicService _anthropicService;
   final FtsService _ftsService;
 
-  /// Cria uma nova conversa.
   Future<Conversation> createConversation({String? title}) async {
+    LoggerService.instance.info(_tag, 'createConversation("$title")');
     final now = DateTime.now();
     final id = await _db.insert('conversations', {
       'title': title,
@@ -55,14 +57,16 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Faz uma pergunta: busca contexto via FTS5, chama API, retorna stream de tokens.
-  /// Persiste pergunta e resposta no banco.
   Stream<String> askQuestion({
     required int conversationId,
     required String question,
     required String model,
   }) async* {
+    LoggerService.instance.info(_tag, 'askQuestion(conv=$conversationId, model=$model, q="${question.length > 50 ? question.substring(0, 50) : question}...")');
+
     // 1. Busca chunks relevantes via FTS5
     final ftsResults = await _ftsService.search(question);
+    LoggerService.instance.info(_tag, 'FTS5 retornou ${ftsResults.length} chunks');
 
     // 2. Monta contexto a partir dos chunks recuperados
     final contextBuffer = StringBuffer();

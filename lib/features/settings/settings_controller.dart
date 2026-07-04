@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/services/logger_service.dart';
 import '../../core/services/secure_storage_service.dart';
 
 /// Controller de configurações — gerencia API key, modelo e biometria.
@@ -8,6 +9,7 @@ class SettingsController extends ChangeNotifier {
   SettingsController({required SecureStorageService storageService})
       : _storageService = storageService;
 
+  static const _tag = 'SettingsController';
   final SecureStorageService _storageService;
 
   String _apiKey = '';
@@ -21,8 +23,8 @@ class SettingsController extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get hasApiKey => _apiKey.isNotEmpty;
 
-  /// Carrega configurações do storage seguro.
   Future<void> load() async {
+    LoggerService.instance.info(_tag, 'load() iniciando');
     _isLoading = true;
     notifyListeners();
 
@@ -31,32 +33,34 @@ class SettingsController extends ChangeNotifier {
     _biometricEnabled = await _storageService.isBiometricEnabled();
 
     _isLoading = false;
+    LoggerService.instance.info(_tag, 'load() completo — hasApiKey=$hasApiKey, model=$_selectedModel, bio=$_biometricEnabled');
     notifyListeners();
   }
 
-  /// Salva a chave de API.
   Future<void> saveApiKey(String key) async {
+    LoggerService.instance.info(_tag, 'saveApiKey() chamado (${key.length} chars)');
     await _storageService.setApiKey(key);
     _apiKey = key;
+    LoggerService.instance.info(_tag, 'saveApiKey() sucesso');
     notifyListeners();
   }
 
-  /// Salva o modelo padrão.
   Future<void> saveModel(String model) async {
+    LoggerService.instance.info(_tag, 'saveModel() → $model');
     await _storageService.setDefaultModel(model);
     _selectedModel = model;
     notifyListeners();
   }
 
-  /// Salva preferência de biometria.
   Future<void> saveBiometric(bool enabled) async {
+    LoggerService.instance.info(_tag, 'saveBiometric() → $enabled');
     await _storageService.setBiometricEnabled(enabled);
     _biometricEnabled = enabled;
     notifyListeners();
   }
 
-  /// Remove a chave de API.
   Future<void> deleteApiKey() async {
+    LoggerService.instance.info(_tag, 'deleteApiKey()');
     await _storageService.deleteApiKey();
     _apiKey = '';
     notifyListeners();

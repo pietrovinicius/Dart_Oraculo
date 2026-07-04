@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/services/logger_service.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -108,14 +109,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 IconButton(
                   icon: const Icon(Icons.save, color: AppColors.accentOrange),
                   onPressed: () async {
-                    await _controller.saveApiKey(_apiKeyController.text.trim());
-                    if (mounted) {
+                    LoggerService.instance.info('SettingsScreen', 'Botão salvar API key pressionado');
+                    final key = _apiKeyController.text.trim();
+                    if (key.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Chave salva com sucesso.'),
-                          backgroundColor: AppColors.success,
+                          content: Text('Digite uma chave antes de salvar.'),
+                          backgroundColor: AppColors.error,
                         ),
                       );
+                      return;
+                    }
+                    try {
+                      await _controller.saveApiKey(key);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Chave salva com sucesso.'),
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erro ao salvar chave: $e'),
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                      }
                     }
                   },
                 ),
