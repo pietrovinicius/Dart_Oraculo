@@ -73,7 +73,18 @@ class Migrations {
     );
   ''';
 
-  /// Executa todas as migrations na ordem correta.
+  // --- V2: message_feedback ---
+
+  static const String createMessageFeedback = '''
+    CREATE TABLE IF NOT EXISTS message_feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message_id INTEGER NOT NULL REFERENCES messages(id),
+      value TEXT NOT NULL CHECK(value IN ('like', 'dislike')),
+      created_at TEXT NOT NULL
+    );
+  ''';
+
+  /// Executa todas as migrations na ordem correta (fresh install).
   static List<String> get allV1 => [
     createDocuments,
     createChunks,
@@ -83,5 +94,16 @@ class Migrations {
     triggerUpdate,
     createConversations,
     createMessages,
+  ];
+
+  /// Migrations incrementais v1 → v2.
+  static List<String> get upgradeV1toV2 => [
+    createMessageFeedback,
+  ];
+
+  /// Fresh install completo (v2).
+  static List<String> get allV2 => [
+    ...allV1,
+    ...upgradeV1toV2,
   ];
 }

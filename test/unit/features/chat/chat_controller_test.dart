@@ -22,9 +22,10 @@ void main() {
     db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 2,
+        singleInstance: false,
         onCreate: (db, version) async {
-          for (final sql in Migrations.allV1) {
+          for (final sql in Migrations.allV2) {
             await db.execute(sql);
           }
         },
@@ -172,6 +173,59 @@ void main() {
 
       final messages = await controller.getMessages(conv.id!);
       expect(messages, isEmpty);
+    });
+
+    group('feedback', () {
+      late int messageId;
+
+      setUp(() async {
+        final conv = await controller.createConversation(title: 'Feedback test');
+        await controller.askQuestion(
+          conversationId: conv.id!,
+          question: 'Pergunta',
+          model: AppConfig.modelSonnet,
+        ).toList();
+        final msgs = await controller.getMessages(conv.id!);
+        messageId = msgs.firstWhere((m) => m.role == 'assistant').id!;
+      });
+
+      test('setFeedback grava like', () async {
+        await controller.setFeedback(messageId, 'like');
+        final result = await controller.getFeedback(messageId);
+        expect(result, equals('like'));
+      });
+
+      test('setFeedback grava dislike', () async {
+        await controller.setFeedback(messageId, 'dislike');
+        final result = await controller.getFeedback(messageId);
+        expect(result, equals('dislike'));
+      });
+
+      test('setFeedback alterna de like para dislike', () async {
+        await controller.setFeedback(messageId, 'like');
+        await controller.setFeedback(messageId, 'dislike');
+        final result = await controller.getFeedback(messageId);
+        expect(result, equals('dislike'));
+      });
+
+      test('setFeedback remove voto com null', () async {
+        await controller.setFeedback(messageId, 'like');
+        await controller.setFeedback(messageId, null);
+        final result = await controller.getFeedback(messageId);
+        expect(result, isNull);
+      });
+
+      test('setFeedback toggle — mesmo valor remove', () async {
+        await controller.setFeedback(messageId, 'like');
+        await controller.setFeedback(messageId, 'like');
+        final result = await controller.getFeedback(messageId);
+        expect(result, isNull);
+      });
+
+      test('getFeedback retorna null sem feedback', () async {
+        final result = await controller.getFeedback(messageId);
+        expect(result, isNull);
+      });
     });
   });
 }

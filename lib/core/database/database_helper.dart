@@ -33,13 +33,22 @@ class DatabaseHelper {
       options: OpenDatabaseOptions(
         version: AppConfig.databaseVersion,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       ),
     );
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    for (final sql in Migrations.allV1) {
+    for (final sql in Migrations.allV2) {
       await db.execute(sql);
+    }
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      for (final sql in Migrations.upgradeV1toV2) {
+        await db.execute(sql);
+      }
     }
   }
 

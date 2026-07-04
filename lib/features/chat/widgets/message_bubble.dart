@@ -10,11 +10,15 @@ class MessageBubble extends StatelessWidget {
     required this.content,
     required this.isUser,
     this.modelUsed,
+    this.feedback,
+    this.onFeedbackChanged,
   });
 
   final String content;
   final bool isUser;
   final String? modelUsed;
+  final String? feedback;
+  final void Function(String? value)? onFeedbackChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -43,14 +47,67 @@ class MessageBubble extends StatelessWidget {
               content,
               style: AppTextStyles.bodyLarge,
             ),
-            if (modelUsed != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                modelUsed!,
-                style: AppTextStyles.techSmall,
+            if (modelUsed != null || (!isUser && onFeedbackChanged != null)) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (modelUsed != null)
+                    Text(modelUsed!, style: AppTextStyles.techSmall),
+                  if (!isUser && onFeedbackChanged != null) ...[
+                    const Spacer(),
+                    _FeedbackButton(
+                      icon: Icons.thumb_up_outlined,
+                      activeIcon: Icons.thumb_up,
+                      isActive: feedback == 'like',
+                      onTap: () => onFeedbackChanged!(
+                        feedback == 'like' ? null : 'like',
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    _FeedbackButton(
+                      icon: Icons.thumb_down_outlined,
+                      activeIcon: Icons.thumb_down,
+                      isActive: feedback == 'dislike',
+                      onTap: () => onFeedbackChanged!(
+                        feedback == 'dislike' ? null : 'dislike',
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedbackButton extends StatelessWidget {
+  const _FeedbackButton({
+    required this.icon,
+    required this.activeIcon,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final IconData activeIcon;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Icon(
+          isActive ? activeIcon : icon,
+          size: 16,
+          color: isActive ? AppColors.accentOrange : AppColors.textMuted,
         ),
       ),
     );

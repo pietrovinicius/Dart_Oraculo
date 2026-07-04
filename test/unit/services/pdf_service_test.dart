@@ -68,5 +68,30 @@ void main() {
         throwsA(isA<Object>()),
       );
     });
+
+    test('onProgress é chamado a cada página extraída', () async {
+      final bytes = _createTestPdf(pages: 4);
+      final progressCalls = <List<int>>[];
+
+      await pdfService.extractText(
+        bytes,
+        onProgress: (current, total) {
+          progressCalls.add([current, total]);
+        },
+      );
+
+      expect(progressCalls, hasLength(4));
+      expect(progressCalls[0], equals([1, 4]));
+      expect(progressCalls[1], equals([2, 4]));
+      expect(progressCalls[2], equals([3, 4]));
+      expect(progressCalls[3], equals([4, 4]));
+    });
+
+    test('onProgress null não causa erro', () async {
+      final bytes = _createTestPdf(pages: 2);
+
+      final pages = await pdfService.extractText(bytes);
+      expect(pages, hasLength(2));
+    });
   });
 }

@@ -164,4 +164,81 @@ class ChatController extends ChangeNotifier {
     );
     notifyListeners();
   }
+
+  // --- Feedback (like/dislike) ---
+
+  /// Grava, alterna ou remove voto de feedback.
+  /// value='like'|'dislike' → grava/alterna. null → remove.
+  /// Se value igual ao existente → remove (toggle off).
+  Future<void> setFeedback(int messageId, String? value) async {
+    LoggerService.instance.info(_tag, 'setFeedback(msg=$messageId, value=$value)');
+
+    final existing = await _db.query(
+      'message_feedback',
+      where: 'message_id = ?',
+      whereArgs: [messageId],
+    );
+
+    if (value == null) {
+      // Remove
+      await _db.delete(
+        'message_feedback',
+        where: 'message_id = ?',
+        whereArgs: [messageId],
+      );
+    } else if (existing.isEmpty) {
+      // Insere novo
+      await _db.insert('message_feedback', {
+        'message_id': messageId,
+        'value': value,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    } else {
+      final currentValue = existing.first['value'] as String;
+      if (currentValue == value) {
+        // Toggle off — mesmo valor = remove
+        await _db.delete(
+          'message_feedback',
+          where: 'message_id = ?',
+          whereArgs: [messageId],
+        );
+      } else {
+        // Alterna para outro valor
+        await _db.update(
+          'message_feedback',
+          {'value': value, 'created_at': DateTime.now().toIso8601String()},
+          where: 'message_id = ?',
+          whereArgs: [messageId],
+        );
+      }
+    }
+    notifyListeners();
+  }
+
+  /// Retorna 'like', 'dislike', ou null.
+  Future<String?> getFeedback(int messageId) async {
+    final rows = await _db.query(
+      'message_feedback',
+      where: 'message_id = ?',
+      whereArgs: [messageId],
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['value'] as String;
+  }
+
+  /// Carrega feedback de todas as mensagens de uma conversa.
+  Future<Map<int, String?>> getFeedbacksForConversation(int conversationId) async {
+    final rows = await _db.rawQuery('''
+      SELECT mf.message_id, mf.value
+      FROM message_feedback mf
+      INNER JOIN messages m ON m.id = mf.message_id
+      WHERE m.conversation_id = ?
+    ''', [conversationId]);
+
+    final result = <int, String?>{};
+    for (final row in rows) {
+      result[row['message_id'] as int] = row['value'] as String?;
+    }
+    return result;
+  }
 }

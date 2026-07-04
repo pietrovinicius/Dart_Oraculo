@@ -32,13 +32,20 @@ class DocumentService {
   static const _tag = 'DocumentService';
 
   /// Ingere um PDF: extrai texto → normaliza para markdown → fragmenta → persiste.
+  /// [onProgress] recebe fração 0.0..1.0 representando progresso da extração.
   Future<Document> ingestPdf({
     required Uint8List bytes,
     required String filename,
     String? sourcePath,
+    void Function(double progress)? onProgress,
   }) async {
     LoggerService.instance.info(_tag, 'ingestPdf("$filename", ${bytes.length} bytes)');
-    final pages = await _pdfService.extractText(bytes);
+    final pages = await _pdfService.extractText(
+      bytes,
+      onProgress: onProgress != null
+          ? (current, total) => onProgress(current / total)
+          : null,
+    );
     LoggerService.instance.info(_tag, 'PDF extraído: ${pages.length} páginas');
 
     final markdown = _normalizer.normalize(pages);
@@ -58,13 +65,16 @@ class DocumentService {
   }
 
   /// Ingere um arquivo Markdown: conteúdo já no formato final → chunking direto.
+  /// [onProgress] chamado com 1.0 imediatamente (leitura instantânea).
   Future<Document> ingestMarkdown({
     required Uint8List bytes,
     required String filename,
     String? sourcePath,
+    void Function(double progress)? onProgress,
   }) async {
     LoggerService.instance.info(_tag, 'ingestMarkdown("$filename", ${bytes.length} bytes)');
     final content = utf8.decode(bytes);
+    onProgress?.call(1.0);
 
     // Markdown já está no formato final — chunking direto com page null
     final textChunks = _chunkingService.chunkPages([

@@ -39,6 +39,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   List<Conversation> _conversations = [];
   List<Message> _messages = [];
+  Map<int, String?> _feedbacks = {};
   int? _activeConversationId;
   int _documentCount = 0;
   bool _isLoading = false;
@@ -97,10 +98,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadMessages(int conversationId) async {
     final msgs = await _chatController?.getMessages(conversationId) ?? [];
+    final feedbacks = await _chatController?.getFeedbacksForConversation(conversationId) ?? {};
     if (mounted) {
       setState(() {
         _activeConversationId = conversationId;
         _messages = msgs;
+        _feedbacks = feedbacks;
       });
     }
   }
@@ -192,55 +195,114 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // --- Estado de importação ---
+  double _importProgress = 0.0;
+  String _importStatus = '';
+  bool _isImporting = false;
+
   Future<void> _importDocument() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'md'],
+      allowMultiple: true,
     );
 
     if (result == null || result.files.isEmpty) return;
 
-    final file = result.files.first;
-    if (file.bytes == null && file.path == null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final bytes = file.bytes ?? await _readFileBytes(file.path!);
-      if (file.name.endsWith('.md')) {
-        await _documentService?.ingestMarkdown(
-          bytes: bytes,
-          filename: file.name,
-          sourcePath: file.path,
-        );
-      } else {
-        await _documentService?.ingestPdf(
-          bytes: bytes,
-          filename: file.name,
-          sourcePath: file.path,
-        );
-      }
-      await _refreshDocumentCount();
-
+    // Validação: máximo 10 arquivos por lote
+    if (result.files.length > 10) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('"${file.name}" importado com sucesso.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao importar: $e'),
+          const SnackBar(
+            content: Text('Selecione no máximo 10 arquivos por vez.'),
             backgroundColor: AppColors.error,
           ),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    setState(() {
+      _isImporting = true;
+      _importProgress = 0.0;
+      _importStatus = '';
+    });
+
+    final totalFiles = result.files.length;
+    var successCount = 0;
+    final errors = <String>[];
+
+    for (var i = 0; i < totalFiles; i++) {
+      final file = result.files[i];
+      if (file.bytes == null && file.path == null) continue;
+
+      setState(() {
+        _importStatus = 'Processando ${i + 1} de $totalFiles: ${file.name}';
+      });
+
+      try {
+        final bytes = file.bytes ?? await _readFileBytes(file.path!);
+        if (file.name.endsWith('.md')) {
+          await _documentService?.ingestMarkdown(
+            bytes: bytes,
+            filename: file.name,
+            sourcePath: file.path,
+            onProgress: (progress) {
+              if (mounted) {
+                setState(() {
+                  _importProgress = (i + progress) / totalFiles;
+                });
+              }
+            },
+          );
+        } else {
+          await _documentService?.ingestPdf(
+            bytes: bytes,
+            filename: file.name,
+            sourcePath: file.path,
+            onProgress: (progress) {
+              if (mounted) {
+                setState(() {
+                  _importProgress = (i + progress) / totalFiles;
+                });
+              }
+            },
+          );
+        }
+        successCount++;
+      } catch (e) {
+        errors.add(file.name);
+      }
+    }
+
+    await _refreshDocumentCount();
+
+    if (mounted) {
+      setState(() {
+        _isImporting = false;
+        _importProgress = 0.0;
+        _importStatus = '';
+      });
+
+      if (errors.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$successCount arquivo(s) importado(s) com sucesso.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$successCount de $totalFiles importado(s). '
+              'Falha em: ${errors.join(", ")}',
+            ),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -295,6 +357,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 // Toolbar
                 _buildToolbar(),
 
+                // Barra de progresso de importação
+                if (_isImporting) _buildImportProgress(),
+
                 // Mensagens
                 Expanded(
                   child: _activeConversationId == null
@@ -305,7 +370,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 // Input
                 ChatInput(
                   onSend: _sendMessage,
-                  enabled: !_isLoading && _activeConversationId != null,
+                  enabled: !_isLoading && !_isImporting && _activeConversationId != null,
                 ),
               ],
             ),
@@ -388,6 +453,25 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildImportProgress() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: AppColors.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_importStatus, style: AppTextStyles.techSmall),
+          const SizedBox(height: 6),
+          LinearProgressIndicator(
+            value: _importProgress,
+            backgroundColor: AppColors.surfaceLight,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentOrange),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMessageList() {
     return ListView.builder(
       padding: const EdgeInsets.only(top: 16, bottom: 8),
@@ -403,6 +487,10 @@ class _ChatScreenState extends State<ChatScreen> {
               content: message.content,
               isUser: isUser,
               modelUsed: isUser ? null : message.modelUsed,
+              feedback: isUser ? null : _feedbacks[message.id],
+              onFeedbackChanged: isUser
+                  ? null
+                  : (value) => _onFeedbackChanged(message.id!, value),
             ),
             if (!isUser)
               CitationStrip(citations: _parseCitations(message)),
@@ -410,5 +498,21 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       },
     );
+  }
+
+  Future<void> _onFeedbackChanged(int messageId, String? value) async {
+    await _chatController?.setFeedback(messageId, value);
+    if (mounted) {
+      setState(() {
+        _feedbacks[messageId] = value;
+        // Se foi toggle-off (mesmo valor), remove do mapa
+        if (value != null && _feedbacks[messageId] == value) {
+          // Recarregar para garantir estado correto
+        }
+      });
+      // Recarregar estado real do feedback
+      final actual = await _chatController?.getFeedback(messageId);
+      if (mounted) setState(() => _feedbacks[messageId] = actual);
+    }
   }
 }
