@@ -18,6 +18,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../collections/collection_service.dart';
 import '../collections/models/collection.dart';
 import '../documents/document_service.dart';
+import '../documents/library_screen.dart';
 import 'chat_controller.dart';
 import 'models/conversation.dart';
 import 'models/message.dart';
@@ -71,12 +72,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _selectedModel = model;
     }
 
+    final anthropicService = AnthropicService(
+      apiKey: apiKey ?? '',
+      httpClient: null,
+    );
+
     _chatController = ChatController(
       database: db,
-      anthropicService: AnthropicService(
-        apiKey: apiKey ?? '',
-        httpClient: null,
-      ),
+      anthropicService: anthropicService,
       ftsService: ftsService,
     );
 
@@ -84,6 +87,9 @@ class _ChatScreenState extends State<ChatScreen> {
       database: db,
       pdfService: PdfService(),
       chunkingService: ChunkingService(),
+      anthropicService: apiKey != null && apiKey.isNotEmpty
+          ? anthropicService
+          : null,
     );
 
     _collectionService = CollectionService(database: db);
@@ -218,6 +224,19 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _togglePin(int id, bool pinned) async {
     await _chatController?.togglePin(id, pinned);
     await _refreshConversations();
+  }
+
+  void _openLibrary() {
+    if (_documentService == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LibraryScreen(
+          documentService: _documentService!,
+          collectionId: _activeCollectionId,
+        ),
+      ),
+    );
   }
 
   String _streamingResponse = '';
@@ -454,6 +473,7 @@ class _ChatScreenState extends State<ChatScreen> {
               onTogglePin: _togglePin,
               documentCount: _documentCount,
               onOpenDocuments: _importDocument,
+              onOpenLibrary: _openLibrary,
             ),
 
           // Divider

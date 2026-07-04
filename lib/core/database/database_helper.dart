@@ -39,7 +39,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    for (final sql in Migrations.allV3) {
+    for (final sql in Migrations.allV4) {
       await db.execute(sql);
     }
     // Fresh install: cria coleção "Geral" padrão
@@ -75,6 +75,11 @@ class DatabaseHelper {
         'UPDATE conversations SET collection_id = ? WHERE collection_id IS NULL',
         [geralId],
       );
+    }
+    if (oldVersion < 4) {
+      for (final sql in Migrations.upgradeV3toV4) {
+        await db.execute(sql);
+      }
     }
   }
 

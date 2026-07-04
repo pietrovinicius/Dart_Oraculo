@@ -414,4 +414,57 @@ void main() {
       await dbUp.close();
     });
   });
+
+  group('Migrations v4 — document description', () {
+    test('documents tem coluna description em fresh install v4', () async {
+      final dbV4 = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 4,
+          singleInstance: false,
+          onCreate: (db, version) async {
+            for (final sql in Migrations.allV4) {
+              await db.execute(sql);
+            }
+          },
+        ),
+      );
+
+      final info = await dbV4.rawQuery('PRAGMA table_info(documents)');
+      final hasDesc = info.any((col) => col['name'] == 'description');
+      expect(hasDesc, isTrue);
+
+      await dbV4.close();
+    });
+
+    test('upgrade v3 → v4 adiciona coluna description', () async {
+      final dbUp = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 3,
+          singleInstance: false,
+          onCreate: (db, version) async {
+            for (final sql in Migrations.allV3) {
+              await db.execute(sql);
+            }
+          },
+        ),
+      );
+
+      // Antes do upgrade, description não existe
+      var info = await dbUp.rawQuery('PRAGMA table_info(documents)');
+      expect(info.any((col) => col['name'] == 'description'), isFalse);
+
+      // Aplica upgrade
+      for (final sql in Migrations.upgradeV3toV4) {
+        await dbUp.execute(sql);
+      }
+
+      // Agora existe
+      info = await dbUp.rawQuery('PRAGMA table_info(documents)');
+      expect(info.any((col) => col['name'] == 'description'), isTrue);
+
+      await dbUp.close();
+    });
+  });
 }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dart_oraculo/core/database/migrations.dart';
@@ -31,6 +32,7 @@ void main() {
   late DocumentService documentService;
 
   setUpAll(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
     sqfliteFfiInit();
   });
 
@@ -38,10 +40,10 @@ void main() {
     db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 3,
+        version: 4,
         singleInstance: false,
         onCreate: (db, version) async {
-          for (final sql in Migrations.allV3) {
+          for (final sql in Migrations.allV4) {
             await db.execute(sql);
           }
         },
@@ -197,6 +199,64 @@ void main() {
       expect(chunks, isNotEmpty);
       // page é null para markdown (arquivo inteiro)
       expect(chunks.first.page, isNull);
+    });
+  });
+
+  group('DocumentService — exportAsMarkdown', () {
+    late Directory tempDir;
+
+    setUp(() {
+      tempDir = Directory.systemTemp.createTempSync('dart_oraculo_test_');
+    });
+
+    tearDown(() {
+      if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+    });
+
+    test('exporta chunks concatenados com separador \\n\\n', () async {
+      const content = 'Parágrafo um.\n\nParágrafo dois.\n\nParágrafo três.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+
+      final doc = await documentService.ingestMarkdown(
+        bytes: bytes,
+        filename: 'export_test.md',
+      );
+
+      final exportPath = await documentService.exportAsMarkdown(
+        doc.id!,
+        outputDir: tempDir,
+      );
+
+      expect(exportPath, contains('export_test.md'));
+
+      final exported = await File(exportPath).readAsString();
+      expect(exported, contains('Parágrafo um.'));
+      expect(exported, contains('Parágrafo dois.'));
+      expect(exported, contains('Parágrafo três.'));
+      expect(exported, contains('Parágrafo um.\n\nParágrafo dois.'));
+    });
+
+    test('exporta múltiplos chunks na ordem correta', () async {
+      const content = 'Primeiro.\n\nSegundo.\n\nTerceiro.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+
+      final doc = await documentService.ingestMarkdown(
+        bytes: bytes,
+        filename: 'order_test.md',
+      );
+
+      final exportPath = await documentService.exportAsMarkdown(
+        doc.id!,
+        outputDir: tempDir,
+      );
+      final exported = await File(exportPath).readAsString();
+
+      final firstIdx = exported.indexOf('Primeiro.');
+      final secondIdx = exported.indexOf('Segundo.');
+      final thirdIdx = exported.indexOf('Terceiro.');
+
+      expect(firstIdx, lessThan(secondIdx));
+      expect(secondIdx, lessThan(thirdIdx));
     });
   });
 }

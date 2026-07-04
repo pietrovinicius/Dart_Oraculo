@@ -22,6 +22,7 @@ class Sidebar extends StatelessWidget {
     required this.onTogglePin,
     required this.documentCount,
     required this.onOpenDocuments,
+    required this.onOpenLibrary,
   });
 
   final List<Collection> collections;
@@ -37,6 +38,7 @@ class Sidebar extends StatelessWidget {
   final void Function(int id, bool pinned) onTogglePin;
   final int documentCount;
   final VoidCallback onOpenDocuments;
+  final VoidCallback onOpenLibrary;
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +175,7 @@ class Sidebar extends StatelessWidget {
               onPressed: onOpenDocuments,
               tooltip: 'Importar documento',
             ),
+            onTap: onOpenLibrary,
           ),
         ],
       ),

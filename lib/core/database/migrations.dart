@@ -144,9 +144,24 @@ class Migrations {
   static List<String> get allV3 => [
     ...allV2,
     createCollections,
-    // Em fresh install, documents e conversations já têm collection_id na definição:
-    // Mas como usamos allV1 que não tem, adicionamos as colunas aqui também.
     addCollectionIdToDocuments,
     addCollectionIdToConversations,
+  ];
+
+  // --- V4: document description ---
+
+  static const String addDescriptionToDocuments = '''
+    ALTER TABLE documents ADD COLUMN description TEXT;
+  ''';
+
+  /// Migrations incrementais v3 → v4.
+  static List<String> get upgradeV3toV4 => [
+    addDescriptionToDocuments,
+  ];
+
+  /// Fresh install completo (v4).
+  static List<String> get allV4 => [
+    ...allV3,
+    addDescriptionToDocuments,
   ];
 }

@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../../core/services/anthropic_service.dart';
 import '../../core/services/chunking_service.dart';
 import '../../core/services/logger_service.dart';
 import '../../core/services/markdown_normalizer.dart';
@@ -19,15 +22,18 @@ class DocumentService {
     required PdfService pdfService,
     required ChunkingService chunkingService,
     MarkdownNormalizer? markdownNormalizer,
+    AnthropicService? anthropicService,
   })  : _db = database,
         _pdfService = pdfService,
         _chunkingService = chunkingService,
-        _normalizer = markdownNormalizer ?? MarkdownNormalizer();
+        _normalizer = markdownNormalizer ?? MarkdownNormalizer(),
+        _anthropicService = anthropicService;
 
   final Database _db;
   final PdfService _pdfService;
   final ChunkingService _chunkingService;
   final MarkdownNormalizer _normalizer;
+  final AnthropicService? _anthropicService;
 
   static const _tag = 'DocumentService';
 
@@ -98,7 +104,7 @@ class DocumentService {
     );
   }
 
-  /// Persiste documento e chunks no banco.
+  /// Persiste documento e chunks no banco, depois gera descrição via AI.
   Future<Document> _persistDocument({
     required String filename,
     String? sourcePath,
@@ -124,13 +130,55 @@ class DocumentService {
       });
     }
 
+    // Gera descrição usando primeiros chunks como contexto
+    final description = await _generateDescription(chunks);
+    if (description != null) {
+      await _db.update(
+        'documents',
+        {'description': description},
+        where: 'id = ?',
+        whereArgs: [docId],
+      );
+    }
+
     return Document(
       id: docId,
       filename: filename,
       sourcePath: sourcePath,
       importedAt: now,
       collectionId: collectionId,
+      description: description,
     );
+  }
+
+  /// Gera descrição de 1-2 frases usando os primeiros chunks como entrada.
+  Future<String?> _generateDescription(List<TextChunk> chunks) async {
+    if (_anthropicService == null) return null;
+    if (chunks.isEmpty) return null;
+
+    try {
+      // Usa primeiros 3 chunks como amostra
+      final sample = chunks.take(3).map((c) => c.content).join('\n\n');
+      final prompt = 'Resuma o documento abaixo em uma a duas frases curtas em português. '
+          'Retorne APENAS o resumo, sem prefixo nem explicação.\n\n$sample';
+
+      final responseBuffer = StringBuffer();
+      await for (final token in _anthropicService!.sendMessage(
+        userMessage: prompt,
+        context: '',
+        history: [],
+        model: 'claude-sonnet-4-6',
+      )) {
+        responseBuffer.write(token);
+      }
+
+      final desc = responseBuffer.toString().trim();
+      LoggerService.instance.info(_tag, 'Descrição gerada: ${desc.length} chars');
+      return desc.isNotEmpty ? desc : null;
+    } catch (e) {
+      LoggerService.instance.warn(_tag, 'Falha ao gerar descrição: $e');
+      return null;
+    }
   }
 
   /// Lista todos os documentos importados.
@@ -145,9 +193,43 @@ class DocumentService {
       'chunks',
       where: 'document_id = ?',
       whereArgs: [documentId],
-      orderBy: 'page ASC, id ASC',
+      orderBy: 'id ASC',
     );
     return rows.map(Chunk.fromMap).toList();
+  }
+
+  /// Exporta documento como markdown concatenando chunks na ordem original.
+  /// [outputDir] é opcional — usa Application Support/exports por padrão.
+  /// Retorna o caminho do arquivo gerado.
+  Future<String> exportAsMarkdown(int documentId, {Directory? outputDir}) async {
+    final doc = await _db.query(
+      'documents',
+      where: 'id = ?',
+      whereArgs: [documentId],
+    );
+    if (doc.isEmpty) throw Exception('Documento não encontrado');
+
+    final filename = doc.first['filename'] as String;
+    final chunks = await getChunksForDocument(documentId);
+    final content = chunks.map((c) => c.content).join('\n\n');
+
+    final Directory exportDir;
+    if (outputDir != null) {
+      exportDir = outputDir;
+    } else {
+      final appDir = await getApplicationSupportDirectory();
+      exportDir = Directory('${appDir.path}/exports');
+    }
+    if (!exportDir.existsSync()) {
+      exportDir.createSync(recursive: true);
+    }
+
+    final baseName = filename.replaceAll(RegExp(r'\.[^.]+$'), '');
+    final exportPath = '${exportDir.path}/$baseName.md';
+    await File(exportPath).writeAsString(content);
+
+    LoggerService.instance.info(_tag, 'Exportado: $exportPath (${content.length} chars)');
+    return exportPath;
   }
 
   /// Deleta documento e seus chunks (cascade manual).
