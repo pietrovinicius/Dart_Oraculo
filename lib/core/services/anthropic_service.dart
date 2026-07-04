@@ -175,6 +175,9 @@ class AnthropicService implements GenerationService {
   String get modelDisplayName => model;
 
   @override
+  int get maxContextCharsPerChunk => 20000;
+
+  @override
   Stream<String> streamResponse({
     required String systemPrompt,
     required List<Map<String, String>> history,

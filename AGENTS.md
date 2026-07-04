@@ -149,3 +149,17 @@ Este documento registra as decisões arquiteturais do Dart Oráculo com a justif
 4. Nunca deve aparecer em scripts de build de Release
 
 **Revisitar quando:** Testes automatizados com mock de `local_auth` permitirem bypass sem flag de compilação.
+
+---
+
+## ADR-016: Limite de contexto por chunk diferenciado por motor de geração
+
+**Decisão:** Cada `GenerationService` declara `maxContextCharsPerChunk`. AnthropicService: 20000. OllamaService: 4000. O `chat_controller` lê esse valor do motor ativo ao montar o contexto.
+
+**Razão intencional:**
+- **Motores em nuvem (Anthropic, 1M tokens):** priorizam completude de resposta. Tabelas grandes como CPOE_MATERIAL (481 colunas) passam quase inteiras, ao custo de mais tokens cobrados.
+- **Motor local (Ollama/Qwen 3.5, 262K tokens):** prioriza velocidade percebida. Trunca tabelas acima de ~50 colunas para manter inferência em tempo aceitável no hardware local.
+
+**Comportamento da truncagem:** O chunk permanece íntegro no banco e no FTS5 (indexação completa). A truncagem acontece apenas no momento de montar o prompt — com nota explicativa ao modelo: "conteúdo truncado, total N linhas, consulte o documento completo."
+
+**Revisitar quando:** Mudança de hardware local ou modelo mais rápido justifique aumentar o limite do Ollama.

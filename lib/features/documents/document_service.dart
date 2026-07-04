@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -254,7 +254,9 @@ class DocumentService {
   }
 
   /// Ingere arquivo CSV ou JSON com chunking por agrupamento de identidade.
-  /// [groupByColumn] é a coluna pela qual agrupar os dados.
+  /// Parsing roda em Isolate para não bloquear UI.
+  /// Inserções em batch via transaction para performance.
+  /// Progresso granular por grupo processado.
   Future<Document> ingestStructuredData({
     required Uint8List bytes,
     required String filename,
@@ -268,20 +270,23 @@ class DocumentService {
       'ingestStructuredData("$filename", groupBy=$groupByColumn)',
     );
 
+    // 1. Parsing em Isolate (não bloqueia UI)
+    onProgress?.call(0.0);
     final content = utf8.decode(bytes);
     final List<Map<String, dynamic>> rows;
 
     if (filename.endsWith('.csv')) {
       rows = _parseCsv(content);
     } else if (filename.endsWith('.json')) {
-      rows = _parseJson(content);
+      rows = await _parseJsonInIsolate(content);
     } else {
       throw ArgumentError('Formato não suportado: $filename (use .csv ou .json)');
     }
 
     LoggerService.instance.info(_tag, 'Parsed ${rows.length} linhas');
-    onProgress?.call(0.5);
+    onProgress?.call(0.3);
 
+    // 2. Chunking
     final chunker = StructuredDataChunker();
     final textChunks = chunker.chunkByGroup(
       rows: rows,
@@ -289,14 +294,105 @@ class DocumentService {
     );
 
     LoggerService.instance.info(_tag, 'Chunking: ${textChunks.length} grupos');
-    onProgress?.call(1.0);
+    onProgress?.call(0.5);
 
-    return _persistDocument(
+    // 3. Persistência com batch inserts + progresso granular
+    return _persistDocumentBatch(
       filename: filename,
       sourcePath: sourcePath,
       collectionId: collectionId,
       chunks: textChunks,
-      useNullPage: true,
+      onProgress: (batchProgress) {
+        // Progresso de 0.5 a 1.0 durante persistência
+        onProgress?.call(0.5 + batchProgress * 0.5);
+      },
+    );
+  }
+
+  /// Parseia JSON em Isolate para não bloquear a thread principal.
+  Future<List<Map<String, dynamic>>> _parseJsonInIsolate(String content) async {
+    // Para arquivos menores (< 5MB), parseia inline sem overhead de Isolate
+    if (content.length < 5 * 1024 * 1024) {
+      return _parseJson(content);
+    }
+    // Para arquivos grandes, usa compute() em Isolate separado
+    return await compute(_parseJsonStatic, content);
+  }
+
+  /// Função estática para rodar em Isolate (não pode acessar `this`).
+  static List<Map<String, dynamic>> _parseJsonStatic(String content) {
+    final decoded = jsonDecode(content);
+    if (decoded is List) {
+      return decoded.cast<Map<String, dynamic>>();
+    }
+    throw const FormatException('JSON deve ser um array de objetos');
+  }
+
+  /// Persiste documento e chunks em batch via transaction.
+  /// Progresso granular por lote de 1000 chunks.
+  Future<Document> _persistDocumentBatch({
+    required String filename,
+    String? sourcePath,
+    int? collectionId,
+    required List<TextChunk> chunks,
+    void Function(double progress)? onProgress,
+  }) async {
+    final now = DateTime.now();
+
+    final docId = await _db.insert('documents', {
+      'filename': filename,
+      'source_path': sourcePath,
+      'collection_id': collectionId,
+      'imported_at': now.toIso8601String(),
+    });
+
+    final totalChunks = chunks.length;
+    const batchSize = 1000;
+
+    for (var i = 0; i < totalChunks; i += batchSize) {
+      final end = (i + batchSize < totalChunks) ? i + batchSize : totalChunks;
+      final batch = chunks.sublist(i, end);
+
+      await _db.transaction((txn) async {
+        for (final chunk in batch) {
+          await txn.insert('chunks', {
+            'document_id': docId,
+            'page': null,
+            'content': chunk.content,
+            'created_at': now.toIso8601String(),
+          });
+        }
+      });
+
+      onProgress?.call(end / totalChunks);
+
+      // Yield ao framework para atualizar UI entre batches
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    // Gera descrição
+    final description = await _generateDescription(chunks);
+    if (description != null) {
+      await _db.update(
+        'documents',
+        {'description': description},
+        where: 'id = ?',
+        whereArgs: [docId],
+      );
+    }
+
+    LoggerService.instance.info(
+      _tag,
+      'Persistido: $totalChunks chunks em batches de $batchSize',
+    );
+
+    return Document(
+      id: docId,
+      filename: filename,
+      sourcePath: sourcePath,
+      importedAt: now,
+      collectionId: collectionId,
+      description: description,
     );
   }
 

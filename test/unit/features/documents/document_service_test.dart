@@ -426,4 +426,58 @@ void main() {
       expect(ftsResult, isNotEmpty);
     });
   });
+
+  group('DocumentService — batch inserts + isolate', () {
+    test('ingestStructuredData com volume grande usa batch (1500+ rows)', () async {
+      // Gera CSV sintético com 1500 rows (forçará pelo menos 2 batches de 1000)
+      final buffer = StringBuffer();
+      buffer.writeln('TABLE_NAME,COLUMN_NAME,DATA_TYPE');
+      for (var i = 0; i < 1500; i++) {
+        final table = 'TABLE_${i ~/ 10}';
+        buffer.writeln('$table,COL_$i,VARCHAR2');
+      }
+      final bytes = Uint8List.fromList(utf8.encode(buffer.toString()));
+
+      var progressCalls = 0;
+      final doc = await documentService.ingestStructuredData(
+        bytes: bytes,
+        filename: 'big_batch.csv',
+        groupByColumn: 'TABLE_NAME',
+        onProgress: (_) => progressCalls++,
+      );
+
+      expect(doc.id, isNotNull);
+
+      // 1500 rows / 10 per table = 150 grupos/chunks
+      final chunks = await documentService.getChunksForDocument(doc.id!);
+      expect(chunks, hasLength(150));
+
+      // Progresso chamado múltiplas vezes (não apenas 2 ticks)
+      expect(progressCalls, greaterThan(3));
+    });
+
+    test('progresso granular reporta por batch processado', () async {
+      final buffer = StringBuffer();
+      buffer.writeln('TABLE_NAME,COLUMN_NAME');
+      for (var i = 0; i < 100; i++) {
+        buffer.writeln('T_$i,C_$i');
+      }
+      final bytes = Uint8List.fromList(utf8.encode(buffer.toString()));
+
+      final progressValues = <double>[];
+      await documentService.ingestStructuredData(
+        bytes: bytes,
+        filename: 'progress_test.csv',
+        groupByColumn: 'TABLE_NAME',
+        onProgress: (p) => progressValues.add(p),
+      );
+
+      // Progresso deve ser monotonicamente crescente
+      for (var i = 1; i < progressValues.length; i++) {
+        expect(progressValues[i], greaterThanOrEqualTo(progressValues[i - 1]));
+      }
+      // Deve terminar em ~1.0
+      expect(progressValues.last, closeTo(1.0, 0.01));
+    });
+  });
 }

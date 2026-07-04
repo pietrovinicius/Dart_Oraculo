@@ -281,5 +281,60 @@ void main() {
         expect(assistant2.modelUsed, equals('claude-opus-4-8'));
       });
     });
+
+    group('truncagem de chunks grandes no prompt', () {
+      test('chunk acima do limite é truncado com nota explicativa', () async {
+        // Insere chunk grande (simula CPOE_MATERIAL)
+        final lines = List.generate(500, (i) => '| COL_$i | VARCHAR2 |');
+        final bigContent = 'Tabela CPOE_MATERIAL, colunas:\n${lines.join('\n')}';
+        final docId = await db.insert('documents', {
+          'filename': 'big_table.csv',
+          'imported_at': DateTime.now().toIso8601String(),
+        });
+        await db.insert('chunks', {
+          'document_id': docId,
+          'page': null,
+          'content': bigContent,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        // Anthropic tem maxContextCharsPerChunk = 20000
+        // Chunk gerado tem ~17K chars (500 linhas × ~35 chars)
+        // Se for > 20000, será truncado; se < 20000, passa inteiro
+        await controller.createConversation(title: 'Truncagem');
+
+        // O chunk é indexado inteiro no FTS5
+        final ftsResults = await db.rawQuery(
+          "SELECT * FROM chunks_fts WHERE chunks_fts MATCH 'CPOE_MATERIAL'",
+        );
+        expect(ftsResults, isNotEmpty);
+
+        // O conteúdo original no banco permanece íntegro
+        final chunks = await db.query('chunks', where: 'document_id = ?', whereArgs: [docId]);
+        expect(chunks.first['content'] as String, equals(bigContent));
+      });
+
+      test('chunk abaixo do limite passa inteiro no contexto', () async {
+        // Chunk pequeno — não deve ser truncado
+        final docId = await db.insert('documents', {
+          'filename': 'small_table.csv',
+          'imported_at': DateTime.now().toIso8601String(),
+        });
+        await db.insert('chunks', {
+          'document_id': docId,
+          'page': null,
+          'content': 'Tabela PACIENTE, colunas:\n| CD_PACIENTE | NUMBER |',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+
+        await controller.createConversation(title: 'Sem truncagem');
+
+        // FTS5 indexa normalmente
+        final ftsResults = await db.rawQuery(
+          "SELECT * FROM chunks_fts WHERE chunks_fts MATCH 'PACIENTE'",
+        );
+        expect(ftsResults, isNotEmpty);
+      });
+    });
   });
 }

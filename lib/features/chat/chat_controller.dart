@@ -105,6 +105,8 @@ class ChatController extends ChangeNotifier {
     LoggerService.instance.info(_tag, 'FTS5 retornou ${ftsResults.length} chunks');
 
     // 2. Monta contexto a partir dos chunks recuperados
+    //    Trunca chunks grandes conforme limite do motor ativo.
+    final maxChars = activeGenerationService.maxContextCharsPerChunk;
     final contextBuffer = StringBuffer();
     // Injeta instructions da coleção antes do contexto RAG
     if (collectionInstructions != null && collectionInstructions.isNotEmpty) {
@@ -112,8 +114,19 @@ class ChatController extends ChangeNotifier {
       contextBuffer.writeln();
     }
     for (final result in ftsResults) {
+      final content = result.content;
+      final String truncatedContent;
+      if (content.length > maxChars) {
+        // Trunca com nota explicativa — chunk indexado permanece íntegro
+        final lineCount = '\n'.allMatches(content).length + 1;
+        truncatedContent = '${content.substring(0, maxChars)}\n'
+            '[... conteúdo truncado. Total: $lineCount linhas / ${content.length} chars. '
+            'Consulte o documento completo para a lista integral.]';
+      } else {
+        truncatedContent = content;
+      }
       contextBuffer.writeln(
-        '[${result.filename}, p.${result.page ?? "?"}]: ${result.content}',
+        '[${result.filename}, p.${result.page ?? "?"}]: $truncatedContent',
       );
       contextBuffer.writeln();
     }

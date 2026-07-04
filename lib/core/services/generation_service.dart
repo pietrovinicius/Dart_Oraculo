@@ -10,4 +10,9 @@ abstract class GenerationService {
 
   /// Identificador do modelo para exibição na UI.
   String get modelDisplayName;
+
+  /// Limite de caracteres por chunk individual no contexto do prompt.
+  /// Motores em nuvem (Anthropic): 20000 — prioriza completude de resposta.
+  /// Motor local (Ollama): 4000 — prioriza velocidade percebida.
+  int get maxContextCharsPerChunk;
 }

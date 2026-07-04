@@ -36,7 +36,11 @@ class OllamaService implements GenerationService {
   final http.Client _httpClient;
 
   @override
+  @override
   String get modelDisplayName => 'Qwen (Local)';
+
+  @override
+  int get maxContextCharsPerChunk => 4000;
 
   /// Verifica se Ollama está rodando e o modelo disponível.
   Future<void> _checkAvailability() async {
