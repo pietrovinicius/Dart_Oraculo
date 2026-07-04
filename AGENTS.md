@@ -163,3 +163,15 @@ Este documento registra as decisões arquiteturais do Dart Oráculo com a justif
 **Comportamento da truncagem:** O chunk permanece íntegro no banco e no FTS5 (indexação completa). A truncagem acontece apenas no momento de montar o prompt — com nota explicativa ao modelo: "conteúdo truncado, total N linhas, consulte o documento completo."
 
 **Revisitar quando:** Mudança de hardware local ou modelo mais rápido justifique aumentar o limite do Ollama.
+
+---
+
+## ADR-017: Parsing de JSON grande sem streaming incremental
+
+**Decisão:** O `jsonDecode` de arquivos JSON grandes (ex: 134MB) roda em Isolate (`compute()`), mas decodifica o arquivo inteiro de uma vez — não é streaming incremental. O pico de memória (~400MB para 134MB de JSON) ocorre dentro do Isolate, não na thread principal.
+
+**Razão (custo-benefício):** Streaming incremental via parser SAX-style ou JSON Lines exigiria refatoração significativa do pipeline (structured_data_chunker espera `List<Map>` completo). O cenário de importação de arquivo >100MB é raro (dicionário de dados completo do TASY — acontece uma vez). O Isolate resolve o problema de UX (UI não congela). O pico de memória é transitório e aceitável em macOS com 8GB+ RAM.
+
+**Procedimento operacional:** Ao importar `tabelas_e_colunas.json` (134MB), descarregar o Qwen local da memória antes (`ollama stop qwen3.5`) para liberar ~7GB de RAM. Após a importação, recarregar o modelo se necessário.
+
+**Revisitar quando:** Importação de arquivos >100MB se tornar recorrente, ou se o app for portado para dispositivos com memória restrita (mobile).
