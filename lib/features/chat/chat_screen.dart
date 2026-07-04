@@ -778,9 +778,10 @@ class _ChatScreenState extends State<ChatScreen> {
     // Conta itens: mensagens + streaming bubble (se ativo)
     final itemCount = _messages.length + (_isStreaming ? 1 : 0);
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
+    return SelectionArea(
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.only(top: 16, bottom: 8),
       itemCount: itemCount,
       itemBuilder: (context, index) {
         // Streaming bubble no final
@@ -809,6 +810,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         );
       },
+      ),
     );
   }
 

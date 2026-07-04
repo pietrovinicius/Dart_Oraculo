@@ -47,9 +47,9 @@ class MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Conteúdo — markdown para assistant, texto plano para user
+            // Conteúdo — markdown para assistant, texto selecionável para user
             if (isUser)
-              Text(content, style: AppTextStyles.bodyLarge)
+              SelectableText(content, style: AppTextStyles.bodyLarge)
             else
               MarkdownBody(
                 data: content,
