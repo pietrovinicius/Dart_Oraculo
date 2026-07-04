@@ -15,7 +15,8 @@ class DartOraculoApp extends StatelessWidget {
       title: 'Dart Oráculo',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      initialRoute: AppRoutes.lock,
+      // TODO(auth): voltar para AppRoutes.lock quando reativar biometria
+      initialRoute: AppRoutes.home,
       routes: {
         AppRoutes.lock: (_) => const LockScreen(),
         AppRoutes.home: (_) => const ChatScreen(),
