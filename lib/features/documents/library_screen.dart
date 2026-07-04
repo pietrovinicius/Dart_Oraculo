@@ -49,7 +49,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   String _docType(String filename) {
     if (filename.endsWith('.md')) return 'Markdown';
+    if (filename.endsWith('.csv')) return 'CSV';
+    if (filename.endsWith('.json')) return 'JSON';
     return 'PDF';
+  }
+
+  IconData _docIcon(String filename) {
+    if (filename.endsWith('.md')) return Icons.description_outlined;
+    if (filename.endsWith('.csv')) return Icons.table_chart_outlined;
+    if (filename.endsWith('.json')) return Icons.data_object_outlined;
+    return Icons.picture_as_pdf_outlined;
   }
 
   Future<void> _exportDocument(Document doc) async {
@@ -136,9 +145,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             Row(
               children: [
                 Icon(
-                  doc.filename.endsWith('.md')
-                      ? Icons.description_outlined
-                      : Icons.picture_as_pdf_outlined,
+                  _docIcon(doc.filename),
                   color: AppColors.accentOrange,
                   size: 20,
                 ),
