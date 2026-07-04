@@ -294,6 +294,7 @@ class _ChatScreenState extends State<ChatScreen> {
         title: const Text('Agrupar por qual coluna?', style: AppTextStyles.bodyLarge),
         content: SizedBox(
           width: 300,
+          height: 400,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -303,11 +304,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 style: AppTextStyles.techSmall,
               ),
               const SizedBox(height: 12),
-              ...columns.map((col) => ListTile(
-                title: Text(col, style: AppTextStyles.bodyMedium),
-                dense: true,
-                onTap: () => Navigator.pop(ctx, col),
-              )),
+              Expanded(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: columns.map((col) => ListTile(
+                    title: Text(col, style: AppTextStyles.bodyMedium),
+                    dense: true,
+                    onTap: () => Navigator.pop(ctx, col),
+                  )).toList(),
+                ),
+              ),
             ],
           ),
         ),
