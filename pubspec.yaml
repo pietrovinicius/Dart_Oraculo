@@ -1,6 +1,6 @@
 name: dart_oraculo
 description: App pessoal de RAG — oráculo de conhecimento via busca FTS5 e Claude API.
-version: 0.1.0+1
+version: 0.11.2+1
 publish_to: 'none'
 
 environment:
@@ -27,6 +27,9 @@ dependencies:
 
   # Extração de PDF
   syncfusion_flutter_pdf: ^25.1.0
+
+  # Informações do pacote
+  package_info_plus: ^8.0.0
 
   # File picker
   file_picker: ^8.0.0

@@ -181,5 +181,35 @@ void main() {
 
       expect(find.text('Nenhuma conversa'), findsOneWidget);
     });
+
+    testWidgets('exibe rodapé com versão e Dev @PLima', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: Sidebar(
+              collections: [Collection(id: 1, name: 'Geral', createdAt: DateTime.now())],
+              activeCollectionId: 1,
+              onCollectionChanged: (_) {},
+              onNewCollection: () {},
+              conversations: const [],
+              selectedConversationId: null,
+              onConversationSelected: (_) {},
+              onNewConversation: () {},
+              onDeleteConversation: (_) {},
+              onRenameConversation: (_, __) {},
+              onTogglePin: (_, __) {},
+              documentCount: 0,
+              onOpenDocuments: () {},
+              onOpenLibrary: () {},
+              appVersion: '0.11.2',
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('v0.11.2'), findsOneWidget);
+      expect(find.text('Dev @PLima'), findsOneWidget);
+    });
   });
 }

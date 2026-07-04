@@ -3,7 +3,7 @@ class AppConfig {
   AppConfig._();
 
   static const String appName = 'Dart Oráculo';
-  static const String appVersion = '0.11.1';
+  static const String appVersion = '0.11.2';
 
   // API Anthropic
   static const String anthropicBaseUrl =

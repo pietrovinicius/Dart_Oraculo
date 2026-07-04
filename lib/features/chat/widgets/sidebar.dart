@@ -24,6 +24,7 @@ class Sidebar extends StatelessWidget {
     required this.documentCount,
     required this.onOpenDocuments,
     required this.onOpenLibrary,
+    this.appVersion = '',
   });
 
   final List<Collection> collections;
@@ -40,6 +41,7 @@ class Sidebar extends StatelessWidget {
   final int documentCount;
   final VoidCallback onOpenDocuments;
   final VoidCallback onOpenLibrary;
+  final String appVersion;
 
   @override
   Widget build(BuildContext context) {
@@ -181,18 +183,17 @@ class Sidebar extends StatelessWidget {
 
           // Rodapé de identificação
           const Divider(color: AppColors.divider, height: 1),
-          // ignore: prefer_const_constructors
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'v${AppConfig.appVersion}',
+                  'v${appVersion.isNotEmpty ? appVersion : AppConfig.appVersion}',
                   style: AppTextStyles.techSmall,
                 ),
-                SizedBox(height: 2),
-                Text(
+                const SizedBox(height: 2),
+                const Text(
                   'Dev @PLima',
                   style: AppTextStyles.techSmall,
                 ),

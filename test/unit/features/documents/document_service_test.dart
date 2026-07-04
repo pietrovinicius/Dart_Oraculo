@@ -3,11 +3,14 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dart_oraculo/core/database/migrations.dart';
+import 'package:dart_oraculo/core/services/anthropic_service.dart';
 import 'package:dart_oraculo/core/services/chunking_service.dart';
 import 'package:dart_oraculo/core/services/markdown_normalizer.dart';
 import 'package:dart_oraculo/core/services/pdf_service.dart';
 import 'package:dart_oraculo/features/documents/document_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
@@ -257,6 +260,101 @@ void main() {
 
       expect(firstIdx, lessThan(secondIdx));
       expect(secondIdx, lessThan(thirdIdx));
+    });
+
+    test('segunda chamada retorna cache sem reprocessar', () async {
+      const content = 'Cache test conteúdo.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+
+      final doc = await documentService.ingestMarkdown(
+        bytes: bytes,
+        filename: 'cache_test.md',
+      );
+
+      final path1 = await documentService.exportAsMarkdown(
+        doc.id!,
+        outputDir: tempDir,
+      );
+      final file1Modified = File(path1).lastModifiedSync();
+
+      // Aguarda 1ms para garantir timestamp diferente se regravasse
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final path2 = await documentService.exportAsMarkdown(
+        doc.id!,
+        outputDir: tempDir,
+      );
+      final file2Modified = File(path2).lastModifiedSync();
+
+      // Mesmo path, mesmo timestamp (não regravou)
+      expect(path1, equals(path2));
+      expect(file1Modified, equals(file2Modified));
+    });
+  });
+
+  group('DocumentService — _generateDescription modelo dinâmico', () {
+    test('usa modelo Sonnet quando configurado', () async {
+      String? modelUsed;
+      final mockClient = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        modelUsed = body['model'] as String?;
+        final responseBody = [
+          'event: content_block_delta\n',
+          'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Resumo do documento."}}\n\n',
+          'event: message_stop\n',
+          'data: {"type":"message_stop"}\n\n',
+        ].join();
+        return http.Response(responseBody, 200);
+      });
+
+      final serviceWithAI = DocumentService(
+        database: db,
+        pdfService: PdfService(),
+        chunkingService: ChunkingService(),
+        anthropicService: AnthropicService(
+          apiKey: 'sk-test',
+          httpClient: mockClient,
+        ),
+        defaultModel: 'claude-sonnet-4-6',
+      );
+
+      const content = 'Conteúdo do documento para gerar descrição.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+      await serviceWithAI.ingestMarkdown(bytes: bytes, filename: 'sonnet.md');
+
+      expect(modelUsed, equals('claude-sonnet-4-6'));
+    });
+
+    test('usa modelo Opus quando configurado', () async {
+      String? modelUsed;
+      final mockClient = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        modelUsed = body['model'] as String?;
+        final responseBody = [
+          'event: content_block_delta\n',
+          'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Resumo Opus."}}\n\n',
+          'event: message_stop\n',
+          'data: {"type":"message_stop"}\n\n',
+        ].join();
+        return http.Response(responseBody, 200);
+      });
+
+      final serviceWithAI = DocumentService(
+        database: db,
+        pdfService: PdfService(),
+        chunkingService: ChunkingService(),
+        anthropicService: AnthropicService(
+          apiKey: 'sk-test',
+          httpClient: mockClient,
+        ),
+        defaultModel: 'claude-opus-4-8',
+      );
+
+      const content = 'Outro conteúdo para testar Opus.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+      await serviceWithAI.ingestMarkdown(bytes: bytes, filename: 'opus.md');
+
+      expect(modelUsed, equals('claude-opus-4-8'));
     });
   });
 }

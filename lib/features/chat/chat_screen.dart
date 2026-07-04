@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/config/app_routes.dart';
@@ -52,6 +53,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = false;
   bool _sidebarVisible = true;
   String _selectedModel = AppConfig.defaultModel;
+  String _appVersion = '';
   final _scrollController = ScrollController();
   bool _stopRequested = false;
 
@@ -94,6 +96,14 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     _collectionService = CollectionService(database: db);
+
+    // Versão dinâmica via package_info_plus
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) setState(() => _appVersion = packageInfo.version);
+    } catch (_) {
+      // Fallback: usa AppConfig.appVersion
+    }
 
     await _refreshCollections();
     await _refreshConversations();
@@ -475,6 +485,7 @@ class _ChatScreenState extends State<ChatScreen> {
               documentCount: _documentCount,
               onOpenDocuments: _importDocument,
               onOpenLibrary: _openLibrary,
+              appVersion: _appVersion,
             ),
 
           // Divider
