@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../collections/models/collection.dart';
@@ -176,6 +177,27 @@ class Sidebar extends StatelessWidget {
               tooltip: 'Importar documento',
             ),
             onTap: onOpenLibrary,
+          ),
+
+          // Rodapé de identificação
+          const Divider(color: AppColors.divider, height: 1),
+          // ignore: prefer_const_constructors
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'v${AppConfig.appVersion}',
+                  style: AppTextStyles.techSmall,
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Dev @PLima',
+                  style: AppTextStyles.techSmall,
+                ),
+              ],
+            ),
           ),
         ],
       ),

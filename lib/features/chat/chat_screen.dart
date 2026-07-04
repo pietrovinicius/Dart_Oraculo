@@ -90,6 +90,7 @@ class _ChatScreenState extends State<ChatScreen> {
       anthropicService: apiKey != null && apiKey.isNotEmpty
           ? anthropicService
           : null,
+      defaultModel: _selectedModel,
     );
 
     _collectionService = CollectionService(database: db);

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/chunking_service.dart';
 import '../../core/services/logger_service.dart';
@@ -23,17 +24,20 @@ class DocumentService {
     required ChunkingService chunkingService,
     MarkdownNormalizer? markdownNormalizer,
     AnthropicService? anthropicService,
+    String? defaultModel,
   })  : _db = database,
         _pdfService = pdfService,
         _chunkingService = chunkingService,
         _normalizer = markdownNormalizer ?? MarkdownNormalizer(),
-        _anthropicService = anthropicService;
+        _anthropicService = anthropicService,
+        _defaultModel = defaultModel;
 
   final Database _db;
   final PdfService _pdfService;
   final ChunkingService _chunkingService;
   final MarkdownNormalizer _normalizer;
   final AnthropicService? _anthropicService;
+  final String? _defaultModel;
 
   static const _tag = 'DocumentService';
 
@@ -167,7 +171,7 @@ class DocumentService {
         userMessage: prompt,
         context: '',
         history: [],
-        model: 'claude-sonnet-4-6',
+        model: _defaultModel ?? AppConfig.defaultModel,
       )) {
         responseBuffer.write(token);
       }
@@ -200,7 +204,12 @@ class DocumentService {
 
   /// Exporta documento como markdown concatenando chunks na ordem original.
   /// [outputDir] é opcional — usa Application Support/exports por padrão.
-  /// Retorna o caminho do arquivo gerado.
+  ///
+  /// Cache por identidade: se o arquivo já existe para este documentId, retorna
+  /// o caminho existente sem reprocessar. Premissa: documentos não são editados
+  /// pós-ingestão. Se edição de documento for adicionada no futuro, a
+  /// invalidação de cache precisará ser revisada (comparar hash ou deletar
+  /// arquivo no momento da edição).
   Future<String> exportAsMarkdown(int documentId, {Directory? outputDir}) async {
     final doc = await _db.query(
       'documents',
@@ -210,8 +219,6 @@ class DocumentService {
     if (doc.isEmpty) throw Exception('Documento não encontrado');
 
     final filename = doc.first['filename'] as String;
-    final chunks = await getChunksForDocument(documentId);
-    final content = chunks.map((c) => c.content).join('\n\n');
 
     final Directory exportDir;
     if (outputDir != null) {
@@ -226,6 +233,15 @@ class DocumentService {
 
     final baseName = filename.replaceAll(RegExp(r'\.[^.]+$'), '');
     final exportPath = '${exportDir.path}/$baseName.md';
+
+    // Cache: se já existe, retorna sem reprocessar
+    if (File(exportPath).existsSync()) {
+      LoggerService.instance.info(_tag, 'Export cache hit: $exportPath');
+      return exportPath;
+    }
+
+    final chunks = await getChunksForDocument(documentId);
+    final content = chunks.map((c) => c.content).join('\n\n');
     await File(exportPath).writeAsString(content);
 
     LoggerService.instance.info(_tag, 'Exportado: $exportPath (${content.length} chars)');
