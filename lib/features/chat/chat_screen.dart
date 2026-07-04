@@ -13,6 +13,7 @@ import '../../core/database/database_helper.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/chunking_service.dart';
 import '../../core/services/fts_service.dart';
+import '../../core/services/ollama_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -97,6 +98,9 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     _collectionService = CollectionService(database: db);
+
+    // Configura motor de geração baseado no modelo padrão
+    _updateGenerationService(_selectedModel);
 
     // Versão dinâmica via package_info_plus
     try {
@@ -638,9 +642,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 value: AppConfig.modelOpus,
                 child: Text('Opus'),
               ),
+              DropdownMenuItem(
+                value: AppConfig.modelQwen,
+                child: Text('Qwen (Local)'),
+              ),
             ],
             onChanged: (value) {
-              if (value != null) setState(() => _selectedModel = value);
+              if (value != null) {
+                setState(() => _selectedModel = value);
+                _updateGenerationService(value);
+              }
             },
           ),
           const SizedBox(width: 8),
@@ -705,6 +716,14 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       },
     );
+  }
+
+  void _updateGenerationService(String model) {
+    if (model == AppConfig.modelQwen) {
+      _chatController?.activeGenerationService = OllamaService();
+    } else {
+      _chatController?.activeGenerationService = null; // usa Anthropic via sendMessage
+    }
   }
 
   void _scrollToBottom() {

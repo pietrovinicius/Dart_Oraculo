@@ -6,12 +6,13 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../../core/config/app_config.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/fts_service.dart';
+import '../../core/services/generation_service.dart';
 import '../../core/services/logger_service.dart';
 import 'models/conversation.dart';
 import 'models/message.dart';
 
 /// Controller principal do chat.
-/// Orquestra: pergunta → recuperação FTS5 → montagem de prompt → API → persistência.
+/// Orquestra: pergunta → recuperação FTS5 → montagem de prompt → geração → persistência.
 class ChatController extends ChangeNotifier {
   ChatController({
     required Database database,
@@ -25,6 +26,10 @@ class ChatController extends ChangeNotifier {
   final Database _db;
   final AnthropicService _anthropicService;
   final FtsService _ftsService;
+
+  /// Motor de geração ativo — pode ser Anthropic ou Ollama.
+  /// Se null, usa _anthropicService como fallback.
+  GenerationService? activeGenerationService;
 
   Future<Conversation> createConversation({String? title, int? collectionId}) async {
     LoggerService.instance.info(_tag, 'createConversation("$title", collection=$collectionId)');
@@ -133,14 +138,22 @@ class ChatController extends ChangeNotifier {
       'created_at': now.toIso8601String(),
     });
 
-    // 5. Chama API e acumula resposta
+    // 5. Chama motor de geração (Anthropic ou Ollama) e acumula resposta
     final responseBuffer = StringBuffer();
-    await for (final token in _anthropicService.sendMessage(
-      userMessage: question,
-      context: context,
-      history: history,
-      model: model,
-    )) {
+    final generationStream = activeGenerationService != null
+        ? activeGenerationService!.streamResponse(
+            systemPrompt: context,
+            history: history,
+            question: question,
+          )
+        : _anthropicService.sendMessage(
+            userMessage: question,
+            context: context,
+            history: history,
+            model: model,
+          );
+
+    await for (final token in generationStream) {
       responseBuffer.write(token);
       yield token;
     }

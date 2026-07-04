@@ -177,14 +177,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 12),
         _buildModelTile(
-          title: 'Sonnet 5',
+          title: 'Sonnet',
           subtitle: 'Rápido, ideal para perguntas cotidianas',
           value: AppConfig.modelSonnet,
         ),
         _buildModelTile(
-          title: 'Opus 4.8',
+          title: 'Opus',
           subtitle: 'Raciocínio mais profundo, ideal para análises complexas',
           value: AppConfig.modelOpus,
+        ),
+        _buildModelTile(
+          title: 'Qwen (Local)',
+          subtitle: 'Offline via Ollama, sem custo de API',
+          value: AppConfig.modelQwen,
         ),
       ],
     );

@@ -3,7 +3,7 @@ class AppConfig {
   AppConfig._();
 
   static const String appName = 'Dart Oráculo';
-  static const String appVersion = '0.11.2';
+  static const String appVersion = '0.13.0';
 
   // API Anthropic
   static const String anthropicBaseUrl =
@@ -13,7 +13,12 @@ class AppConfig {
   // Modelos disponíveis
   static const String modelSonnet = 'claude-sonnet-4-6';
   static const String modelOpus = 'claude-opus-4-8';
+  static const String modelQwen = 'qwen-local';
   static const String defaultModel = modelSonnet;
+
+  // Ollama
+  static const String ollamaBaseUrl = 'http://localhost:11434';
+  static const String ollamaModel = 'qwen3.5:latest';
 
   // RAG
   static const int maxChunksPerQuery = 10;

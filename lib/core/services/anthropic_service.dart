@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import 'generation_service.dart';
 import 'logger_service.dart';
 
 /// Exceção para erros da API Anthropic.
@@ -17,12 +18,15 @@ class AnthropicException implements Exception {
 }
 
 /// Cliente HTTP direto para api.anthropic.com/v1/messages.
-class AnthropicService {
+class AnthropicService implements GenerationService {
   AnthropicService({
     required String apiKey,
     http.Client? httpClient,
+    this.model = 'claude-sonnet-4-6',
   })  : _apiKey = apiKey,
         _httpClient = httpClient ?? http.Client();
+
+  final String model;
 
   static const _tag = 'AnthropicAPI';
   final String _apiKey;
@@ -163,5 +167,24 @@ class AnthropicService {
       LoggerService.instance.error(_tag, 'Erro de rede/conexão', e, stack);
       throw AnthropicException('Erro de conexão: $e', 0);
     }
+  }
+
+  // --- GenerationService interface ---
+
+  @override
+  String get modelDisplayName => model;
+
+  @override
+  Stream<String> streamResponse({
+    required String systemPrompt,
+    required List<Map<String, String>> history,
+    required String question,
+  }) {
+    return sendMessage(
+      userMessage: question,
+      context: systemPrompt,
+      history: history,
+      model: model,
+    );
   }
 }
