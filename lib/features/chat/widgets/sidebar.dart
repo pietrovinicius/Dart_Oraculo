@@ -96,7 +96,11 @@ class Sidebar extends StatelessWidget {
               'Documentos ($documentCount)',
               style: AppTextStyles.bodyMedium,
             ),
-            onTap: onOpenDocuments,
+            trailing: IconButton(
+              icon: const Icon(Icons.add, color: AppColors.accentOrange),
+              onPressed: onOpenDocuments,
+              tooltip: 'Importar documento',
+            ),
           ),
         ],
       ),

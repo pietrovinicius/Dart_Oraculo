@@ -330,11 +330,11 @@ class _ChatScreenState extends State<ChatScreen> {
             items: const [
               DropdownMenuItem(
                 value: AppConfig.modelSonnet,
-                child: Text('Sonnet 5'),
+                child: Text('Sonnet'),
               ),
               DropdownMenuItem(
                 value: AppConfig.modelOpus,
-                child: Text('Opus 4.8'),
+                child: Text('Opus'),
               ),
             ],
             onChanged: (value) {
