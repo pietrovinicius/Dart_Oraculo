@@ -27,9 +27,12 @@ class ChatController extends ChangeNotifier {
   final AnthropicService _anthropicService;
   final FtsService _ftsService;
 
-  /// Motor de geração ativo — pode ser Anthropic ou Ollama.
-  /// Se null, usa _anthropicService como fallback.
-  GenerationService? activeGenerationService;
+  /// Exposto para que o chat_screen possa setá-lo como activeGenerationService.
+  AnthropicService get anthropicService => _anthropicService;
+
+  /// Motor de geração ativo — sempre setado, nunca null.
+  /// Injetado pelo chat_screen. Default: _anthropicService.
+  late GenerationService activeGenerationService = _anthropicService;
 
   Future<Conversation> createConversation({String? title, int? collectionId}) async {
     LoggerService.instance.info(_tag, 'createConversation("$title", collection=$collectionId)');
@@ -138,33 +141,24 @@ class ChatController extends ChangeNotifier {
       'created_at': now.toIso8601String(),
     });
 
-    // 5. Chama motor de geração (Anthropic ou Ollama) e acumula resposta
+    // 5. Chama motor de geração ativo (injeção pura, sem condicional)
     final responseBuffer = StringBuffer();
-    final generationStream = activeGenerationService != null
-        ? activeGenerationService!.streamResponse(
-            systemPrompt: context,
-            history: history,
-            question: question,
-          )
-        : _anthropicService.sendMessage(
-            userMessage: question,
-            context: context,
-            history: history,
-            model: model,
-          );
-
-    await for (final token in generationStream) {
+    await for (final token in activeGenerationService.streamResponse(
+      systemPrompt: context,
+      history: history,
+      question: question,
+    )) {
       responseBuffer.write(token);
       yield token;
     }
 
-    // 6. Persiste resposta do assistant
+    // 6. Persiste resposta do assistant com nome do modelo que gerou
     final chunkIds = ftsResults.map((r) => r.chunkId).toList();
     await _db.insert('messages', {
       'conversation_id': conversationId,
       'role': 'assistant',
       'content': responseBuffer.toString(),
-      'model_used': model,
+      'model_used': activeGenerationService.modelDisplayName,
       'chunks_used': jsonEncode(chunkIds),
       'created_at': DateTime.now().toIso8601String(),
     });

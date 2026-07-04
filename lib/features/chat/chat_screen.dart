@@ -13,6 +13,7 @@ import '../../core/database/database_helper.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/chunking_service.dart';
 import '../../core/services/fts_service.dart';
+import '../../core/services/generation_service.dart';
 import '../../core/services/ollama_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/secure_storage_service.dart';
@@ -87,6 +88,14 @@ class _ChatScreenState extends State<ChatScreen> {
       ftsService: ftsService,
     );
 
+    // Resolve GenerationService para geração de descrição
+    GenerationService? descriptionService;
+    if (_selectedModel == AppConfig.modelQwen) {
+      descriptionService = OllamaService();
+    } else if (apiKey != null && apiKey.isNotEmpty) {
+      descriptionService = anthropicService;
+    }
+
     _documentService = DocumentService(
       database: db,
       pdfService: PdfService(),
@@ -94,6 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
       anthropicService: apiKey != null && apiKey.isNotEmpty
           ? anthropicService
           : null,
+      generationService: descriptionService,
       defaultModel: _selectedModel,
     );
 
@@ -719,10 +729,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _updateGenerationService(String model) {
+    if (_chatController == null) return;
     if (model == AppConfig.modelQwen) {
-      _chatController?.activeGenerationService = OllamaService();
+      _chatController!.activeGenerationService = OllamaService();
     } else {
-      _chatController?.activeGenerationService = null; // usa Anthropic via sendMessage
+      // Anthropic com o modelo selecionado
+      _chatController!.activeGenerationService = _chatController!.anthropicService;
     }
   }
 

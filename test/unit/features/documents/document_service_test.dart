@@ -307,15 +307,17 @@ void main() {
         return http.Response(responseBody, 200);
       });
 
+      final anthropic = AnthropicService(
+        apiKey: 'sk-test',
+        httpClient: mockClient,
+        model: 'claude-sonnet-4-6',
+      );
+
       final serviceWithAI = DocumentService(
         database: db,
         pdfService: PdfService(),
         chunkingService: ChunkingService(),
-        anthropicService: AnthropicService(
-          apiKey: 'sk-test',
-          httpClient: mockClient,
-        ),
-        defaultModel: 'claude-sonnet-4-6',
+        generationService: anthropic,
       );
 
       const content = 'Conteúdo do documento para gerar descrição.';
@@ -339,15 +341,17 @@ void main() {
         return http.Response(responseBody, 200);
       });
 
+      final anthropic = AnthropicService(
+        apiKey: 'sk-test',
+        httpClient: mockClient,
+        model: 'claude-opus-4-8',
+      );
+
       final serviceWithAI = DocumentService(
         database: db,
         pdfService: PdfService(),
         chunkingService: ChunkingService(),
-        anthropicService: AnthropicService(
-          apiKey: 'sk-test',
-          httpClient: mockClient,
-        ),
-        defaultModel: 'claude-opus-4-8',
+        generationService: anthropic,
       );
 
       const content = 'Outro conteúdo para testar Opus.';

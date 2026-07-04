@@ -6,9 +6,9 @@ import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import '../../core/config/app_config.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/chunking_service.dart';
+import '../../core/services/generation_service.dart';
 import '../../core/services/logger_service.dart';
 import '../../core/services/markdown_normalizer.dart';
 import '../../core/services/pdf_service.dart';
@@ -26,20 +26,21 @@ class DocumentService {
     required ChunkingService chunkingService,
     MarkdownNormalizer? markdownNormalizer,
     AnthropicService? anthropicService,
+    GenerationService? generationService,
     String? defaultModel,
   })  : _db = database,
         _pdfService = pdfService,
         _chunkingService = chunkingService,
         _normalizer = markdownNormalizer ?? MarkdownNormalizer(),
         _anthropicService = anthropicService,
-        _defaultModel = defaultModel;
+        _generationService = generationService;
 
   final Database _db;
   final PdfService _pdfService;
   final ChunkingService _chunkingService;
   final MarkdownNormalizer _normalizer;
   final AnthropicService? _anthropicService;
-  final String? _defaultModel;
+  final GenerationService? _generationService;
 
   static const _tag = 'DocumentService';
 
@@ -158,8 +159,11 @@ class DocumentService {
   }
 
   /// Gera descrição de 1-2 frases usando os primeiros chunks como entrada.
+  /// Usa o GenerationService ativo (pode ser Anthropic ou Ollama).
   Future<String?> _generateDescription(List<TextChunk> chunks) async {
-    if (_anthropicService == null) return null;
+    // Resolve qual service usar: _generationService (preferido) ou _anthropicService (fallback)
+    final service = _generationService ?? _anthropicService;
+    if (service == null) return null;
     if (chunks.isEmpty) return null;
 
     try {
@@ -169,11 +173,10 @@ class DocumentService {
           'Retorne APENAS o resumo, sem prefixo nem explicação.\n\n$sample';
 
       final responseBuffer = StringBuffer();
-      await for (final token in _anthropicService!.sendMessage(
-        userMessage: prompt,
-        context: '',
+      await for (final token in service.streamResponse(
+        systemPrompt: 'Você é um assistente que gera resumos concisos.',
         history: [],
-        model: _defaultModel ?? AppConfig.defaultModel,
+        question: prompt,
       )) {
         responseBuffer.write(token);
       }

@@ -227,5 +227,59 @@ void main() {
         expect(result, isNull);
       });
     });
+
+    group('troca de GenerationService', () {
+      test('trocar motor não altera FTS5 nem chunks_used', () async {
+        final conv = await controller.createConversation(title: 'Motor test');
+
+        // Usa motor padrão (Anthropic mock)
+        await controller.askQuestion(
+          conversationId: conv.id!,
+          question: 'O que é Flutter?',
+          model: AppConfig.modelSonnet,
+        ).toList();
+
+        final messages1 = await controller.getMessages(conv.id!);
+        final assistant1 = messages1.firstWhere((m) => m.role == 'assistant');
+        expect(assistant1.chunksUsed, isNotNull);
+        final chunks1 = jsonDecode(assistant1.chunksUsed!) as List;
+
+        // Troca para um "outro" GenerationService (mesmo mock, diferente instância)
+        controller.activeGenerationService = AnthropicService(
+          apiKey: 'sk-test-2',
+          httpClient: MockClient((request) async {
+            final responseBody = [
+              'event: content_block_delta\n',
+              'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Resposta do segundo motor."}}\n\n',
+              'event: message_stop\n',
+              'data: {"type":"message_stop"}\n\n',
+            ].join();
+            return http.Response(responseBody, 200);
+          }),
+          model: 'claude-opus-4-8',
+        );
+
+        await controller.askQuestion(
+          conversationId: conv.id!,
+          question: 'O que é Flutter?',
+          model: AppConfig.modelOpus,
+        ).toList();
+
+        final messages2 = await controller.getMessages(conv.id!);
+        // 4 mensagens: 2 user + 2 assistant
+        expect(messages2, hasLength(4));
+
+        final assistant2 = messages2.last;
+        expect(assistant2.role, equals('assistant'));
+        expect(assistant2.chunksUsed, isNotNull);
+
+        // FTS5 retorna mesmos chunks (mesma query, mesma base)
+        final chunks2 = jsonDecode(assistant2.chunksUsed!) as List;
+        expect(chunks2, equals(chunks1));
+
+        // model_used reflete o novo motor
+        expect(assistant2.modelUsed, equals('claude-opus-4-8'));
+      });
+    });
   });
 }

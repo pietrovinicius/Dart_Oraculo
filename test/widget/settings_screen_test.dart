@@ -167,5 +167,19 @@ void main() {
 
       expect(notifyCount, equals(5)); // 2 load + 3 saves
     });
+
+    test('aceita Qwen (Local) como modelo padrão com persistência', () async {
+      await controller.load();
+      await controller.saveModel(AppConfig.modelQwen);
+
+      expect(controller.selectedModel, equals(AppConfig.modelQwen));
+      expect(await storageService.getDefaultModel(), equals(AppConfig.modelQwen));
+
+      // Recarrega e confirma persistência
+      final controller2 = SettingsController(storageService: storageService);
+      await controller2.load();
+      expect(controller2.selectedModel, equals(AppConfig.modelQwen));
+      controller2.dispose();
+    });
   });
 }
