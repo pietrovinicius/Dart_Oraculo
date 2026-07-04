@@ -23,6 +23,11 @@ class _LockScreenState extends State<LockScreen> {
   /// Usar: flutter run --dart-define=SKIP_AUTH=true
   static const _skipAuth = bool.fromEnvironment('SKIP_AUTH');
 
+  // TODO(auth): Reativar autenticação biométrica no futuro.
+  // Flag para desabilitar auth temporariamente durante desenvolvimento.
+  // Setar para false quando biometria for reativada.
+  static const _authDisabled = true;
+
   @override
   void initState() {
     super.initState();
@@ -30,8 +35,9 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _tryAuthenticate() async {
-    // Bypass para ambiente de desenvolvimento/teste automatizado
-    if (_skipAuth) {
+    // Auth desabilitada temporariamente — navega direto para home
+    // TODO(auth): remover este bloco quando reativar biometria
+    if (_authDisabled || _skipAuth) {
       _navigateHome();
       return;
     }
