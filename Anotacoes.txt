@@ -1,0 +1,134 @@
+═══════════════════════════════════════════════════════════════════
+                    DART ORÁCULO — INSTRUÇÕES DE SETUP
+═══════════════════════════════════════════════════════════════════
+
+──────────────────────────────────────────────────────────────────
+ PRÉ-REQUISITOS (macOS e Windows)
+──────────────────────────────────────────────────────────────────
+
+1. Flutter SDK instalado (>= 3.19.0)
+   - macOS: https://docs.flutter.dev/get-started/install/macos
+   - Windows: https://docs.flutter.dev/get-started/install/windows
+   - Verifique com: flutter --version
+
+2. Dart SDK (vem embutido no Flutter SDK, >= 3.0.0)
+
+3. Xcode (somente macOS)
+   - Necessário para compilar o runner nativo macOS
+   - Instale via App Store ou: xcode-select --install
+
+4. Visual Studio (somente Windows)
+   - Necessário para compilar o runner nativo Windows
+   - Instale o Visual Studio com o workload "Desktop development with C++"
+
+──────────────────────────────────────────────────────────────────
+ SETUP INICIAL (primeira vez)
+──────────────────────────────────────────────────────────────────
+
+1. Clone o repositório:
+   git clone https://github.com/pietrovinicius/Dart_Oraculo.git
+   cd Dart_Oraculo
+
+2. Instale as dependências:
+   flutter pub get
+
+3. Verifique que a plataforma está habilitada:
+   flutter config --enable-macos-desktop   (macOS)
+   flutter config --enable-windows-desktop (Windows)
+
+4. Verifique dispositivos disponíveis:
+   flutter devices
+
+──────────────────────────────────────────────────────────────────
+ RODAR NO macOS
+──────────────────────────────────────────────────────────────────
+
+   flutter run -d macos
+
+   Ou use o script:
+   ./run_macos.sh
+
+   Build de release:
+   flutter build macos --release
+
+   O app compilado fica em:
+   build/macos/Build/Products/Release/dart_oraculo.app
+
+──────────────────────────────────────────────────────────────────
+ RODAR NO WINDOWS
+──────────────────────────────────────────────────────────────────
+
+   flutter run -d windows
+
+   Ou use o script:
+   run_windows.bat
+
+   Build de release:
+   flutter build windows --release
+
+   O app compilado fica em:
+   build\windows\x64\runner\Release\dart_oraculo.exe
+
+──────────────────────────────────────────────────────────────────
+ VARIÁVEIS DE AMBIENTE (OPCIONAL)
+──────────────────────────────────────────────────────────────────
+
+   SYNCFUSION_LICENSE_KEY  — Chave de licença Syncfusion (não obrigatória
+                             na v25.x, mas necessária para distribuição)
+
+──────────────────────────────────────────────────────────────────
+ COMANDOS ÚTEIS
+──────────────────────────────────────────────────────────────────
+
+   flutter pub get            — Instalar/atualizar dependências
+   flutter analyze            — Análise estática (lint)
+   flutter test               — Rodar todos os testes
+   flutter test test/unit/... — Rodar teste específico
+   flutter clean              — Limpar build cache
+   flutter build macos        — Build debug macOS
+   flutter build windows      — Build debug Windows
+
+──────────────────────────────────────────────────────────────────
+ LOGS
+──────────────────────────────────────────────────────────────────
+
+   Os logs aparecem em duas formas:
+
+   1. Console — visíveis no terminal durante "flutter run"
+   2. Arquivo log.txt — salvo em:
+      macOS:   ~/Library/Containers/com.pietrolima.dartOraculo/Data/
+               Library/Application Support/com.pietrolima.dartOraculo/log.txt
+      Windows: %APPDATA%\com.pietrolima\dartOraculo\log.txt
+
+──────────────────────────────────────────────────────────────────
+ CONFIGURAÇÃO DO APP (PRIMEIRA EXECUÇÃO)
+──────────────────────────────────────────────────────────────────
+
+   1. Abra o app → tela de bloqueio → clique no ícone de fingerprint
+   2. Na tela principal, clique no ícone de engrenagem (⚙) no canto superior
+   3. Cole sua chave de API da Anthropic (sk-ant-...) e clique em salvar (💾)
+   4. Selecione o modelo padrão (Sonnet 5 ou Opus 4.8)
+   5. Volte à tela principal
+   6. Crie uma conversa (+) na sidebar
+   7. Importe PDFs ou Markdowns clicando em "Documentos" na sidebar
+   8. Faça perguntas sobre o conteúdo carregado
+
+──────────────────────────────────────────────────────────────────
+ PROBLEMAS COMUNS
+──────────────────────────────────────────────────────────────────
+
+   Q: "flutter run -d macos" falha com erro de sandbox/entitlements
+   A: Limpe o build com "flutter clean" e rode novamente.
+
+   Q: sqflite warning sobre "changing default factory"
+   A: Normal — é a inicialização do sqflite_common_ffi para desktop.
+
+   Q: Chave de API não salva
+   A: Verifique se a chave não está vazia. O app valida antes de salvar.
+      Verifique os logs no console para mensagens de erro.
+
+   Q: PDF não importa
+   A: Apenas PDFs com texto nativo são suportados. PDFs escaneados
+      (apenas imagem) não são processados na v1.
+
+═══════════════════════════════════════════════════════════════════
