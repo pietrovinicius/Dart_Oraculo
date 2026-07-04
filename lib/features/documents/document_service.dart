@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -11,6 +12,7 @@ import '../../core/services/chunking_service.dart';
 import '../../core/services/logger_service.dart';
 import '../../core/services/markdown_normalizer.dart';
 import '../../core/services/pdf_service.dart';
+import '../../core/services/structured_data_chunker.dart';
 import 'models/chunk.dart';
 import 'models/document.dart';
 
@@ -246,6 +248,77 @@ class DocumentService {
 
     LoggerService.instance.info(_tag, 'Exportado: $exportPath (${content.length} chars)');
     return exportPath;
+  }
+
+  /// Ingere arquivo CSV ou JSON com chunking por agrupamento de identidade.
+  /// [groupByColumn] é a coluna pela qual agrupar os dados.
+  Future<Document> ingestStructuredData({
+    required Uint8List bytes,
+    required String filename,
+    required String groupByColumn,
+    String? sourcePath,
+    int? collectionId,
+    void Function(double progress)? onProgress,
+  }) async {
+    LoggerService.instance.info(
+      _tag,
+      'ingestStructuredData("$filename", groupBy=$groupByColumn)',
+    );
+
+    final content = utf8.decode(bytes);
+    final List<Map<String, dynamic>> rows;
+
+    if (filename.endsWith('.csv')) {
+      rows = _parseCsv(content);
+    } else if (filename.endsWith('.json')) {
+      rows = _parseJson(content);
+    } else {
+      throw ArgumentError('Formato não suportado: $filename (use .csv ou .json)');
+    }
+
+    LoggerService.instance.info(_tag, 'Parsed ${rows.length} linhas');
+    onProgress?.call(0.5);
+
+    final chunker = StructuredDataChunker();
+    final textChunks = chunker.chunkByGroup(
+      rows: rows,
+      groupByColumn: groupByColumn,
+    );
+
+    LoggerService.instance.info(_tag, 'Chunking: ${textChunks.length} grupos');
+    onProgress?.call(1.0);
+
+    return _persistDocument(
+      filename: filename,
+      sourcePath: sourcePath,
+      collectionId: collectionId,
+      chunks: textChunks,
+      useNullPage: true,
+    );
+  }
+
+  /// Parseia CSV para lista de mapas (header como chave).
+  List<Map<String, dynamic>> _parseCsv(String content) {
+    final parsed = const CsvToListConverter(eol: '\n').convert(content);
+    if (parsed.length < 2) return [];
+
+    final headers = parsed.first.map((h) => h.toString()).toList();
+    return parsed.skip(1).map((row) {
+      final map = <String, dynamic>{};
+      for (var i = 0; i < headers.length && i < row.length; i++) {
+        map[headers[i]] = row[i];
+      }
+      return map;
+    }).toList();
+  }
+
+  /// Parseia JSON array para lista de mapas.
+  List<Map<String, dynamic>> _parseJson(String content) {
+    final decoded = jsonDecode(content);
+    if (decoded is List) {
+      return decoded.cast<Map<String, dynamic>>();
+    }
+    throw const FormatException('JSON deve ser um array de objetos');
   }
 
   /// Deleta documento e seus chunks (cascade manual).

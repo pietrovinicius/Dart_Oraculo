@@ -357,4 +357,69 @@ void main() {
       expect(modelUsed, equals('claude-opus-4-8'));
     });
   });
+
+  group('DocumentService — ingestStructuredData', () {
+    test('ingere CSV agrupado por coluna', () async {
+      const csvContent = 'TABLE_NAME,COLUMN_NAME,DATA_TYPE\n'
+          'PACIENTE,CD_PACIENTE,NUMBER\n'
+          'PACIENTE,NM_PACIENTE,VARCHAR2\n'
+          'MEDICO,CD_MEDICO,NUMBER\n'
+          'MEDICO,NM_MEDICO,VARCHAR2\n';
+      final bytes = Uint8List.fromList(utf8.encode(csvContent));
+
+      final doc = await documentService.ingestStructuredData(
+        bytes: bytes,
+        filename: 'tab_columns.csv',
+        groupByColumn: 'TABLE_NAME',
+      );
+
+      expect(doc.id, isNotNull);
+      expect(doc.filename, equals('tab_columns.csv'));
+
+      final chunks = await documentService.getChunksForDocument(doc.id!);
+      // 2 tabelas = 2 chunks
+      expect(chunks, hasLength(2));
+      expect(chunks[0].content, contains('PACIENTE'));
+      expect(chunks[1].content, contains('MEDICO'));
+    });
+
+    test('ingere JSON agrupado por coluna', () async {
+      final jsonContent = jsonEncode([
+        {'TRIGGER_NAME': 'TRG_PACIENTE', 'TABLE_NAME': 'PACIENTE', 'STATUS': 'ENABLED'},
+        {'TRIGGER_NAME': 'TRG_PACIENTE', 'TABLE_NAME': 'PACIENTE', 'STATUS': 'ENABLED'},
+        {'TRIGGER_NAME': 'TRG_MEDICO', 'TABLE_NAME': 'MEDICO', 'STATUS': 'DISABLED'},
+      ]);
+      final bytes = Uint8List.fromList(utf8.encode(jsonContent));
+
+      final doc = await documentService.ingestStructuredData(
+        bytes: bytes,
+        filename: 'triggers.json',
+        groupByColumn: 'TRIGGER_NAME',
+      );
+
+      expect(doc.id, isNotNull);
+
+      final chunks = await documentService.getChunksForDocument(doc.id!);
+      expect(chunks, hasLength(2));
+      expect(chunks[0].content, contains('TRG_PACIENTE'));
+      expect(chunks[1].content, contains('TRG_MEDICO'));
+    });
+
+    test('chunks de dados estruturados são indexados no FTS5', () async {
+      const csvContent = 'TABLE_NAME,COLUMN_NAME\n'
+          'PACIENTE,CD_PACIENTE\n';
+      final bytes = Uint8List.fromList(utf8.encode(csvContent));
+
+      await documentService.ingestStructuredData(
+        bytes: bytes,
+        filename: 'fts_structured.csv',
+        groupByColumn: 'TABLE_NAME',
+      );
+
+      final ftsResult = await db.rawQuery(
+        "SELECT * FROM chunks_fts WHERE chunks_fts MATCH 'PACIENTE'",
+      );
+      expect(ftsResult, isNotEmpty);
+    });
+  });
 }

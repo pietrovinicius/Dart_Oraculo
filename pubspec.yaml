@@ -31,6 +31,9 @@ dependencies:
   # Informações do pacote
   package_info_plus: ^8.0.0
 
+  # CSV parsing
+  csv: ^6.0.0
+
   # File picker
   file_picker: ^8.0.0
 

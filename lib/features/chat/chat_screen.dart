@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:typed_data';
 
+import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -250,6 +251,62 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  /// Dialog para selecionar coluna de agrupamento em CSV/JSON.
+  Future<String?> _showGroupByDialog(Uint8List bytes, String filename) async {
+    // Detecta colunas disponíveis
+    final content = utf8.decode(bytes);
+    List<String> columns;
+
+    try {
+      if (filename.endsWith('.csv')) {
+        final parsed = const CsvToListConverter(eol: '\n').convert(content);
+        if (parsed.isEmpty) return null;
+        columns = parsed.first.map((h) => h.toString()).toList();
+      } else {
+        final decoded = jsonDecode(content);
+        if (decoded is! List || decoded.isEmpty) return null;
+        columns = (decoded.first as Map<String, dynamic>).keys.toList();
+      }
+    } catch (_) {
+      return null;
+    }
+
+    if (columns.isEmpty) return null;
+
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Agrupar por qual coluna?', style: AppTextStyles.bodyLarge),
+        content: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Arquivo: $filename',
+                style: AppTextStyles.techSmall,
+              ),
+              const SizedBox(height: 12),
+              ...columns.map((col) => ListTile(
+                title: Text(col, style: AppTextStyles.bodyMedium),
+                dense: true,
+                onTap: () => Navigator.pop(ctx, col),
+              )),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _streamingResponse = '';
   bool _isStreaming = false;
 
@@ -340,7 +397,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _importDocument() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'md'],
+      allowedExtensions: ['pdf', 'md', 'csv', 'json'],
       allowMultiple: true,
     );
 
@@ -379,7 +436,28 @@ class _ChatScreenState extends State<ChatScreen> {
 
       try {
         final bytes = file.bytes ?? await _readFileBytes(file.path!);
-        if (file.name.endsWith('.md')) {
+        final isStructured = file.name.endsWith('.csv') || file.name.endsWith('.json');
+
+        if (isStructured) {
+          // Dialog para selecionar coluna de agrupamento
+          final groupByColumn = await _showGroupByDialog(bytes, file.name);
+          if (groupByColumn == null) continue; // Cancelado
+
+          await _documentService?.ingestStructuredData(
+            bytes: bytes,
+            filename: file.name,
+            groupByColumn: groupByColumn,
+            sourcePath: file.path,
+            collectionId: _activeCollectionId,
+            onProgress: (progress) {
+              if (mounted) {
+                setState(() {
+                  _importProgress = (i + progress) / totalFiles;
+                });
+              }
+            },
+          );
+        } else if (file.name.endsWith('.md')) {
           await _documentService?.ingestMarkdown(
             bytes: bytes,
             filename: file.name,
