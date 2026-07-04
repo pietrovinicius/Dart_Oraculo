@@ -218,6 +218,9 @@ class _ChatScreenState extends State<ChatScreen> {
     await _refreshConversations();
   }
 
+  String _streamingResponse = '';
+  bool _isStreaming = false;
+
   Future<void> _sendMessage(String text) async {
     if (_activeConversationId == null || _chatController == null) return;
 
@@ -234,10 +237,24 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    // 1. Mostra mensagem do usuário imediatamente
+    setState(() {
+      _messages = [
+        ..._messages,
+        Message(
+          conversationId: _activeConversationId!,
+          role: 'user',
+          content: text,
+          createdAt: DateTime.now(),
+        ),
+      ];
+      _isLoading = true;
+      _isStreaming = true;
+      _streamingResponse = '';
+    });
 
     try {
-      final responseBuffer = StringBuffer();
+      // 2. Streaming da resposta token a token
       await for (final token in _chatController!.askQuestion(
         conversationId: _activeConversationId!,
         question: text,
@@ -245,11 +262,12 @@ class _ChatScreenState extends State<ChatScreen> {
         collectionId: _activeCollectionId,
         collectionInstructions: _activeCollection?.instructions,
       )) {
-        responseBuffer.write(token);
-        // Atualiza UI incrementalmente
+        _streamingResponse += token;
         if (mounted) setState(() {});
       }
 
+      // 3. Carrega mensagens reais do banco (substitui as temporárias)
+      setState(() => _isStreaming = false);
       await _loadMessages(_activeConversationId!);
     } on AnthropicException catch (e) {
       if (mounted) {
@@ -560,10 +578,18 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageList() {
+    // Conta itens: mensagens + streaming bubble (se ativo)
+    final itemCount = _messages.length + (_isStreaming ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.only(top: 16, bottom: 8),
-      itemCount: _messages.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        // Streaming bubble no final
+        if (_isStreaming && index == _messages.length) {
+          return _buildStreamingBubble();
+        }
+
         final message = _messages[index];
         final isUser = message.role == 'user';
 
@@ -575,15 +601,63 @@ class _ChatScreenState extends State<ChatScreen> {
               isUser: isUser,
               modelUsed: isUser ? null : message.modelUsed,
               feedback: isUser ? null : _feedbacks[message.id],
-              onFeedbackChanged: isUser
+              onFeedbackChanged: (isUser || message.id == null)
                   ? null
                   : (value) => _onFeedbackChanged(message.id!, value),
             ),
-            if (!isUser)
+            if (!isUser && message.id != null)
               CitationStrip(citations: _parseCitations(message)),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildStreamingBubble() {
+    if (_streamingResponse.isEmpty) {
+      // Indicador de "pensando" — dots animados
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16).copyWith(
+              bottomLeft: const Radius.circular(4),
+            ),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.accentOrange.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Pensando...',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.textMuted,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Resposta parcial em streaming
+    return MessageBubble(
+      content: _streamingResponse,
+      isUser: false,
+      modelUsed: _selectedModel,
     );
   }
 
