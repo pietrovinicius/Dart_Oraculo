@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../collections/models/collection.dart';
 import '../models/conversation.dart';
 
-/// Sidebar retrátil com lista de conversas e biblioteca de documentos.
+/// Sidebar retrátil com seletor de coleção, lista de conversas e documentos.
 class Sidebar extends StatelessWidget {
   const Sidebar({
     super.key,
+    required this.collections,
+    required this.activeCollectionId,
+    required this.onCollectionChanged,
+    required this.onNewCollection,
     required this.conversations,
     required this.selectedConversationId,
     required this.onConversationSelected,
@@ -19,6 +24,10 @@ class Sidebar extends StatelessWidget {
     required this.onOpenDocuments,
   });
 
+  final List<Collection> collections;
+  final int? activeCollectionId;
+  final void Function(int id) onCollectionChanged;
+  final VoidCallback onNewCollection;
   final List<Conversation> conversations;
   final int? selectedConversationId;
   final void Function(int id) onConversationSelected;
@@ -36,15 +45,19 @@ class Sidebar extends StatelessWidget {
       color: AppColors.surface,
       child: Column(
         children: [
-          // Header
+          // Seletor de coleção
+          _buildCollectionSelector(context),
+          const Divider(color: AppColors.divider, height: 1),
+
+          // Header conversas
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               children: [
                 const Text('Conversas', style: AppTextStyles.bodyLarge),
                 const Spacer(),
                 IconButton(
-                  icon: const Icon(Icons.add, color: AppColors.accentOrange),
+                  icon: const Icon(Icons.add, color: AppColors.accentOrange, size: 20),
                   onPressed: onNewConversation,
                   tooltip: 'Nova conversa',
                 ),
@@ -160,6 +173,39 @@ class Sidebar extends StatelessWidget {
               onPressed: onOpenDocuments,
               tooltip: 'Importar documento',
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCollectionSelector(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+      child: Row(
+        children: [
+          const Icon(Icons.collections_bookmark, size: 18, color: AppColors.accentOrange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButton<int>(
+              value: activeCollectionId,
+              isExpanded: true,
+              dropdownColor: AppColors.surfaceLight,
+              style: AppTextStyles.bodyMedium,
+              underline: const SizedBox.shrink(),
+              items: collections.map((c) => DropdownMenuItem(
+                value: c.id,
+                child: Text(c.name, overflow: TextOverflow.ellipsis),
+              )).toList(),
+              onChanged: (id) {
+                if (id != null) onCollectionChanged(id);
+              },
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_box_outlined, size: 18, color: AppColors.accentOrange),
+            onPressed: onNewCollection,
+            tooltip: 'Nova coleção',
           ),
         ],
       ),

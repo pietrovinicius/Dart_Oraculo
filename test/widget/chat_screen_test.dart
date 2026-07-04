@@ -4,6 +4,7 @@ import 'package:dart_oraculo/features/chat/widgets/chat_input.dart';
 import 'package:dart_oraculo/features/chat/widgets/citation_strip.dart';
 import 'package:dart_oraculo/features/chat/widgets/message_bubble.dart';
 import 'package:dart_oraculo/features/chat/widgets/sidebar.dart';
+import 'package:dart_oraculo/features/collections/models/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -129,6 +130,10 @@ void main() {
           theme: AppTheme.dark,
           home: Scaffold(
             body: Sidebar(
+              collections: [Collection(id: 1, name: 'Geral', createdAt: DateTime.now())],
+              activeCollectionId: 1,
+              onCollectionChanged: (_) {},
+              onNewCollection: () {},
               conversations: conversations,
               selectedConversationId: 1,
               onConversationSelected: (_) {},
@@ -154,6 +159,10 @@ void main() {
           theme: AppTheme.dark,
           home: Scaffold(
             body: Sidebar(
+              collections: [Collection(id: 1, name: 'Geral', createdAt: DateTime.now())],
+              activeCollectionId: 1,
+              onCollectionChanged: (_) {},
+              onNewCollection: () {},
               conversations: const [],
               selectedConversationId: null,
               onConversationSelected: (_) {},

@@ -5,12 +5,14 @@ class Document {
     required this.filename,
     this.sourcePath,
     required this.importedAt,
+    this.collectionId,
   });
 
   final int? id;
   final String filename;
   final String? sourcePath;
   final DateTime importedAt;
+  final int? collectionId;
 
   Map<String, dynamic> toMap() {
     return {
@@ -18,6 +20,7 @@ class Document {
       'filename': filename,
       'source_path': sourcePath,
       'imported_at': importedAt.toIso8601String(),
+      'collection_id': collectionId,
     };
   }
 
@@ -26,5 +29,6 @@ class Document {
     filename: map['filename'] as String,
     sourcePath: map['source_path'] as String?,
     importedAt: DateTime.parse(map['imported_at'] as String),
+    collectionId: map['collection_id'] as int?,
   );
 }

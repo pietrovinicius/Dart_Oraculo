@@ -301,4 +301,117 @@ void main() {
       await dbUpgrade.close();
     });
   });
+
+  group('Migrations v3 — collections', () {
+    late Database dbV3;
+
+    setUp(() async {
+      dbV3 = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 3,
+          singleInstance: false,
+          onCreate: (db, version) async {
+            for (final sql in Migrations.allV3) {
+              await db.execute(sql);
+            }
+            // Simula fresh install: cria coleção Geral
+            await db.insert('collections', {
+              'name': 'Geral',
+              'instructions': null,
+              'created_at': DateTime.now().toIso8601String(),
+            });
+          },
+        ),
+      );
+    });
+
+    tearDown(() async {
+      await dbV3.close();
+    });
+
+    test('cria tabela collections', () async {
+      final result = await dbV3.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='collections'",
+      );
+      expect(result, hasLength(1));
+    });
+
+    test('documents tem coluna collection_id', () async {
+      final info = await dbV3.rawQuery('PRAGMA table_info(documents)');
+      final hasCol = info.any((col) => col['name'] == 'collection_id');
+      expect(hasCol, isTrue);
+    });
+
+    test('conversations tem coluna collection_id', () async {
+      final info = await dbV3.rawQuery('PRAGMA table_info(conversations)');
+      final hasCol = info.any((col) => col['name'] == 'collection_id');
+      expect(hasCol, isTrue);
+    });
+
+    test('coleção Geral criada no fresh install', () async {
+      final rows = await dbV3.query('collections');
+      expect(rows, hasLength(1));
+      expect(rows.first['name'], equals('Geral'));
+    });
+
+    test('upgrade v2 → v3 cria collections e faz backfill', () async {
+      // Simula DB v2 com dados
+      final dbUp = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 2,
+          singleInstance: false,
+          onCreate: (db, version) async {
+            for (final sql in Migrations.allV2) {
+              await db.execute(sql);
+            }
+          },
+        ),
+      );
+
+      // Insere dados pré-existentes
+      await dbUp.insert('documents', {
+        'filename': 'old.pdf',
+        'imported_at': DateTime.now().toIso8601String(),
+      });
+      await dbUp.insert('conversations', {
+        'title': 'Old conv',
+        'pinned': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // Aplica upgrade v2→v3
+      for (final sql in Migrations.upgradeV2toV3Schema) {
+        await dbUp.execute(sql);
+      }
+      final geralId = await dbUp.insert('collections', {
+        'name': 'Geral',
+        'instructions': null,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      await dbUp.execute(
+        'UPDATE documents SET collection_id = ? WHERE collection_id IS NULL',
+        [geralId],
+      );
+      await dbUp.execute(
+        'UPDATE conversations SET collection_id = ? WHERE collection_id IS NULL',
+        [geralId],
+      );
+
+      // Verifica: nenhum órfão
+      final docs = await dbUp.query('documents');
+      expect(docs.first['collection_id'], equals(geralId));
+
+      final convs = await dbUp.query('conversations');
+      expect(convs.first['collection_id'], equals(geralId));
+
+      // Collections existe
+      final collections = await dbUp.query('collections');
+      expect(collections, hasLength(1));
+      expect(collections.first['name'], equals('Geral'));
+
+      await dbUp.close();
+    });
+  });
 }

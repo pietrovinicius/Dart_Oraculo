@@ -15,9 +15,10 @@ void main() {
     db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 3,
+        singleInstance: false,
         onCreate: (db, version) async {
-          for (final sql in Migrations.allV1) {
+          for (final sql in Migrations.allV3) {
             await db.execute(sql);
           }
         },
@@ -25,17 +26,30 @@ void main() {
     );
     ftsService = FtsService(database: db);
 
+    // Seed: 2 coleções
+    await db.insert('collections', {
+      'name': 'Dev',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    await db.insert('collections', {
+      'name': 'Data',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
     // Seed: 3 documentos com chunks variados
     await db.insert('documents', {
       'filename': 'flutter.pdf',
+      'collection_id': 1,
       'imported_at': DateTime.now().toIso8601String(),
     });
     await db.insert('documents', {
       'filename': 'dart.pdf',
+      'collection_id': 1,
       'imported_at': DateTime.now().toIso8601String(),
     });
     await db.insert('documents', {
       'filename': 'python.pdf',
+      'collection_id': 2,
       'imported_at': DateTime.now().toIso8601String(),
     });
 
@@ -145,6 +159,30 @@ void main() {
 
       final resultsSpaces = await ftsService.search('   ');
       expect(resultsSpaces, isEmpty);
+    });
+
+    test('busca filtrada por collectionId retorna só chunks daquela coleção', () async {
+      // Coleção 1 (Dev) tem flutter e dart
+      final devResults = await ftsService.search('linguagem', collectionId: 1);
+      expect(devResults, isNotEmpty);
+      expect(devResults.every((r) => r.documentId <= 2), isTrue);
+    });
+
+    test('busca filtrada não retorna chunks de outra coleção', () async {
+      // Python está na coleção 2 (Data)
+      final devResults = await ftsService.search('Python', collectionId: 1);
+      expect(devResults, isEmpty);
+    });
+
+    test('busca filtrada pela coleção 2 retorna Python', () async {
+      final dataResults = await ftsService.search('Python', collectionId: 2);
+      expect(dataResults, hasLength(1));
+      expect(dataResults.first.filename, equals('python.pdf'));
+    });
+
+    test('busca sem collectionId retorna de todas as coleções', () async {
+      final allResults = await ftsService.search('linguagem');
+      expect(allResults.length, greaterThanOrEqualTo(2));
     });
   });
 }

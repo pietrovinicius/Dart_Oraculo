@@ -37,6 +37,7 @@ class DocumentService {
     required Uint8List bytes,
     required String filename,
     String? sourcePath,
+    int? collectionId,
     void Function(double progress)? onProgress,
   }) async {
     LoggerService.instance.info(_tag, 'ingestPdf("$filename", ${bytes.length} bytes)');
@@ -60,6 +61,7 @@ class DocumentService {
     return _persistDocument(
       filename: filename,
       sourcePath: sourcePath,
+      collectionId: collectionId,
       chunks: textChunks,
     );
   }
@@ -70,6 +72,7 @@ class DocumentService {
     required Uint8List bytes,
     required String filename,
     String? sourcePath,
+    int? collectionId,
     void Function(double progress)? onProgress,
   }) async {
     LoggerService.instance.info(_tag, 'ingestMarkdown("$filename", ${bytes.length} bytes)');
@@ -89,6 +92,7 @@ class DocumentService {
     return _persistDocument(
       filename: filename,
       sourcePath: sourcePath,
+      collectionId: collectionId,
       chunks: chunksWithNullPage,
       useNullPage: true,
     );
@@ -100,12 +104,14 @@ class DocumentService {
     String? sourcePath,
     required List<TextChunk> chunks,
     bool useNullPage = false,
+    int? collectionId,
   }) async {
     final now = DateTime.now();
 
     final docId = await _db.insert('documents', {
       'filename': filename,
       'source_path': sourcePath,
+      'collection_id': collectionId,
       'imported_at': now.toIso8601String(),
     });
 
@@ -123,6 +129,7 @@ class DocumentService {
       filename: filename,
       sourcePath: sourcePath,
       importedAt: now,
+      collectionId: collectionId,
     );
   }
 

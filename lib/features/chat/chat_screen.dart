@@ -15,6 +15,8 @@ import '../../core/services/pdf_service.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../collections/collection_service.dart';
+import '../collections/models/collection.dart';
 import '../documents/document_service.dart';
 import 'chat_controller.dart';
 import 'models/conversation.dart';
@@ -35,8 +37,12 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   ChatController? _chatController;
   DocumentService? _documentService;
+  CollectionService? _collectionService;
   final _storageService = SecureStorageService();
 
+  List<Collection> _collections = [];
+  int? _activeCollectionId;
+  Collection? _activeCollection;
   List<Conversation> _conversations = [];
   List<Message> _messages = [];
   Map<int, String?> _feedbacks = {};
@@ -78,21 +84,93 @@ class _ChatScreenState extends State<ChatScreen> {
       chunkingService: ChunkingService(),
     );
 
+    _collectionService = CollectionService(database: db);
+
+    await _refreshCollections();
     await _refreshConversations();
     await _refreshDocumentCount();
   }
 
+  Future<void> _refreshCollections() async {
+    final cols = await _collectionService?.listCollections() ?? [];
+    if (mounted) {
+      setState(() {
+        _collections = cols;
+        if (_activeCollectionId == null && cols.isNotEmpty) {
+          _activeCollectionId = cols.first.id;
+          _activeCollection = cols.first;
+        }
+      });
+    }
+  }
+
+  void _onCollectionChanged(int id) {
+    final col = _collections.firstWhere((c) => c.id == id);
+    setState(() {
+      _activeCollectionId = id;
+      _activeCollection = col;
+      _activeConversationId = null;
+      _messages = [];
+      _feedbacks = {};
+    });
+    _refreshConversations();
+    _refreshDocumentCount();
+  }
+
+  Future<void> _createNewCollection() async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Nova coleção', style: AppTextStyles.bodyLarge),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: AppTextStyles.bodyLarge,
+          decoration: const InputDecoration(hintText: 'Nome da coleção'),
+          onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Criar', style: TextStyle(color: AppColors.accentOrange)),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      final col = await _collectionService?.createCollection(name: result);
+      if (col != null) {
+        await _refreshCollections();
+        _onCollectionChanged(col.id!);
+      }
+    }
+  }
+
   Future<void> _refreshConversations() async {
     final convs = await _chatController?.listConversations() ?? [];
+    // Filtra por coleção ativa
+    final filtered = _activeCollectionId == null
+        ? convs
+        : convs.where((c) => c.collectionId == _activeCollectionId).toList();
     if (mounted) {
-      setState(() => _conversations = convs);
+      setState(() => _conversations = filtered);
     }
   }
 
   Future<void> _refreshDocumentCount() async {
     final docs = await _documentService?.listDocuments() ?? [];
+    // Filtra por coleção ativa
+    final filtered = _activeCollectionId == null
+        ? docs
+        : docs.where((d) => d.collectionId == _activeCollectionId).toList();
     if (mounted) {
-      setState(() => _documentCount = docs.length);
+      setState(() => _documentCount = filtered.length);
     }
   }
 
@@ -111,6 +189,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _createNewConversation() async {
     final conv = await _chatController?.createConversation(
       title: 'Nova conversa',
+      collectionId: _activeCollectionId,
     );
     if (conv != null) {
       await _refreshConversations();
@@ -163,6 +242,8 @@ class _ChatScreenState extends State<ChatScreen> {
         conversationId: _activeConversationId!,
         question: text,
         model: _selectedModel,
+        collectionId: _activeCollectionId,
+        collectionInstructions: _activeCollection?.instructions,
       )) {
         responseBuffer.write(token);
         // Atualiza UI incrementalmente
@@ -247,6 +328,7 @@ class _ChatScreenState extends State<ChatScreen> {
             bytes: bytes,
             filename: file.name,
             sourcePath: file.path,
+            collectionId: _activeCollectionId,
             onProgress: (progress) {
               if (mounted) {
                 setState(() {
@@ -260,6 +342,7 @@ class _ChatScreenState extends State<ChatScreen> {
             bytes: bytes,
             filename: file.name,
             sourcePath: file.path,
+            collectionId: _activeCollectionId,
             onProgress: (progress) {
               if (mounted) {
                 setState(() {
@@ -332,6 +415,10 @@ class _ChatScreenState extends State<ChatScreen> {
           // Sidebar
           if (_sidebarVisible)
             Sidebar(
+              collections: _collections,
+              activeCollectionId: _activeCollectionId,
+              onCollectionChanged: _onCollectionChanged,
+              onNewCollection: _createNewCollection,
               conversations: _conversations,
               selectedConversationId: _activeConversationId,
               onConversationSelected: _loadMessages,

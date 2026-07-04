@@ -26,14 +26,15 @@ class ChatController extends ChangeNotifier {
   final AnthropicService _anthropicService;
   final FtsService _ftsService;
 
-  Future<Conversation> createConversation({String? title}) async {
-    LoggerService.instance.info(_tag, 'createConversation("$title")');
+  Future<Conversation> createConversation({String? title, int? collectionId}) async {
+    LoggerService.instance.info(_tag, 'createConversation("$title", collection=$collectionId)');
     final now = DateTime.now();
     final id = await _db.insert('conversations', {
       'title': title,
+      'collection_id': collectionId,
       'created_at': now.toIso8601String(),
     });
-    return Conversation(id: id, title: title, createdAt: now);
+    return Conversation(id: id, title: title, createdAt: now, collectionId: collectionId);
   }
 
   /// Lista todas as conversas — fixadas primeiro, depois por data.
@@ -81,19 +82,27 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Faz uma pergunta: busca contexto via FTS5, chama API, retorna stream de tokens.
+  /// [collectionId] filtra busca FTS por coleção. [collectionInstructions] injeta no prompt.
   Stream<String> askQuestion({
     required int conversationId,
     required String question,
     required String model,
+    int? collectionId,
+    String? collectionInstructions,
   }) async* {
-    LoggerService.instance.info(_tag, 'askQuestion(conv=$conversationId, model=$model, q="${question.length > 50 ? question.substring(0, 50) : question}...")');
+    LoggerService.instance.info(_tag, 'askQuestion(conv=$conversationId, model=$model, collection=$collectionId, q="${question.length > 50 ? question.substring(0, 50) : question}...")');
 
-    // 1. Busca chunks relevantes via FTS5
-    final ftsResults = await _ftsService.search(question);
+    // 1. Busca chunks relevantes via FTS5 (filtrado por coleção)
+    final ftsResults = await _ftsService.search(question, collectionId: collectionId);
     LoggerService.instance.info(_tag, 'FTS5 retornou ${ftsResults.length} chunks');
 
     // 2. Monta contexto a partir dos chunks recuperados
     final contextBuffer = StringBuffer();
+    // Injeta instructions da coleção antes do contexto RAG
+    if (collectionInstructions != null && collectionInstructions.isNotEmpty) {
+      contextBuffer.writeln('[Instruções da coleção]: $collectionInstructions');
+      contextBuffer.writeln();
+    }
     for (final result in ftsResults) {
       contextBuffer.writeln(
         '[${result.filename}, p.${result.page ?? "?"}]: ${result.content}',

@@ -28,20 +28,27 @@ class FtsService {
   final Database _db;
 
   /// Busca chunks relevantes para a [query].
+  /// Filtra por [collectionId] quando fornecido (só retorna chunks de docs daquela coleção).
   /// Retorna até [limit] resultados ordenados por relevância BM25.
   Future<List<FtsResult>> search(
     String query, {
     int? limit,
+    int? collectionId,
   }) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return [];
 
     final effectiveLimit = limit ?? AppConfig.maxChunksPerQuery;
 
-    // Sanitiza a query para FTS5: remove caracteres especiais que
-    // poderiam quebrar a sintaxe FTS5
     final sanitized = _sanitizeQuery(trimmed);
     if (sanitized.isEmpty) return [];
+
+    final whereClause = collectionId != null
+        ? 'WHERE chunks_fts MATCH ? AND d.collection_id = ?'
+        : 'WHERE chunks_fts MATCH ?';
+    final args = collectionId != null
+        ? [sanitized, collectionId, effectiveLimit]
+        : [sanitized, effectiveLimit];
 
     final rows = await _db.rawQuery('''
       SELECT
@@ -54,10 +61,10 @@ class FtsService {
       FROM chunks_fts
       JOIN chunks c ON c.id = chunks_fts.rowid
       JOIN documents d ON d.id = c.document_id
-      WHERE chunks_fts MATCH ?
+      $whereClause
       ORDER BY rank
       LIMIT ?
-    ''', [sanitized, effectiveLimit]);
+    ''', args);
 
     return rows.map((row) => FtsResult(
       chunkId: row['chunk_id'] as int,

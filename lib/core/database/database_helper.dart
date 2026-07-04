@@ -39,9 +39,15 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    for (final sql in Migrations.allV2) {
+    for (final sql in Migrations.allV3) {
       await db.execute(sql);
     }
+    // Fresh install: cria coleção "Geral" padrão
+    await db.insert('collections', {
+      'name': 'Geral',
+      'instructions': null,
+      'created_at': DateTime.now().toIso8601String(),
+    });
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -49,6 +55,26 @@ class DatabaseHelper {
       for (final sql in Migrations.upgradeV1toV2) {
         await db.execute(sql);
       }
+    }
+    if (oldVersion < 3) {
+      // Cria tabela + colunas
+      for (final sql in Migrations.upgradeV2toV3Schema) {
+        await db.execute(sql);
+      }
+      // Backfill: cria coleção "Geral" e associa dados existentes
+      final geralId = await db.insert('collections', {
+        'name': 'Geral',
+        'instructions': null,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      await db.execute(
+        'UPDATE documents SET collection_id = ? WHERE collection_id IS NULL',
+        [geralId],
+      );
+      await db.execute(
+        'UPDATE conversations SET collection_id = ? WHERE collection_id IS NULL',
+        [geralId],
+      );
     }
   }
 

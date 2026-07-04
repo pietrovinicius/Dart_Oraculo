@@ -107,9 +107,46 @@ class Migrations {
   ];
 
   /// Fresh install completo (v2) — schema já inclui pinned em createConversations.
-  /// Não executa ALTER TABLE (só para upgrade de banco existente).
   static List<String> get allV2 => [
     ...allV1,
     createMessageFeedback,
+  ];
+
+  // --- V3: collections ---
+
+  static const String createCollections = '''
+    CREATE TABLE IF NOT EXISTS collections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      instructions TEXT,
+      created_at TEXT NOT NULL
+    );
+  ''';
+
+  static const String addCollectionIdToDocuments = '''
+    ALTER TABLE documents ADD COLUMN collection_id INTEGER REFERENCES collections(id);
+  ''';
+
+  static const String addCollectionIdToConversations = '''
+    ALTER TABLE conversations ADD COLUMN collection_id INTEGER REFERENCES collections(id);
+  ''';
+
+  /// Migrations incrementais v2 → v3.
+  /// Nota: o backfill (criar "Geral" e UPDATE) é feito em código no onUpgrade,
+  /// não em SQL estático, porque precisa capturar o ID inserido.
+  static List<String> get upgradeV2toV3Schema => [
+    createCollections,
+    addCollectionIdToDocuments,
+    addCollectionIdToConversations,
+  ];
+
+  /// Fresh install completo (v3).
+  static List<String> get allV3 => [
+    ...allV2,
+    createCollections,
+    // Em fresh install, documents e conversations já têm collection_id na definição:
+    // Mas como usamos allV1 que não tem, adicionamos as colunas aqui também.
+    addCollectionIdToDocuments,
+    addCollectionIdToConversations,
   ];
 }

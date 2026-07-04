@@ -38,9 +38,10 @@ void main() {
     db = await databaseFactoryFfi.openDatabase(
       inMemoryDatabasePath,
       options: OpenDatabaseOptions(
-        version: 1,
+        version: 3,
+        singleInstance: false,
         onCreate: (db, version) async {
-          for (final sql in Migrations.allV1) {
+          for (final sql in Migrations.allV3) {
             await db.execute(sql);
           }
         },
