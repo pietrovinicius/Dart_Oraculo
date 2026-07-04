@@ -1,28 +1,34 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../core/services/chunking_service.dart';
+import '../../core/services/markdown_normalizer.dart';
 import '../../core/services/pdf_service.dart';
 import 'models/chunk.dart';
 import 'models/document.dart';
 
 /// Serviço de ingestão de documentos.
-/// Orquestra: extração PDF → chunking → persistência no SQLite.
+/// Orquestra: extração → normalização markdown → chunking → persistência.
+/// Suporta PDF e Markdown como formatos de entrada.
 class DocumentService {
   DocumentService({
     required Database database,
     required PdfService pdfService,
     required ChunkingService chunkingService,
+    MarkdownNormalizer? markdownNormalizer,
   })  : _db = database,
         _pdfService = pdfService,
-        _chunkingService = chunkingService;
+        _chunkingService = chunkingService,
+        _normalizer = markdownNormalizer ?? MarkdownNormalizer();
 
   final Database _db;
   final PdfService _pdfService;
   final ChunkingService _chunkingService;
+  final MarkdownNormalizer _normalizer;
 
-  /// Ingere um PDF: extrai texto, fragmenta, persiste documento e chunks.
+  /// Ingere um PDF: extrai texto → normaliza para markdown → fragmenta → persiste.
   /// Retorna o [Document] criado com seu ID.
   Future<Document> ingestPdf({
     required Uint8List bytes,
@@ -30,8 +36,57 @@ class DocumentService {
     String? sourcePath,
   }) async {
     final pages = await _pdfService.extractText(bytes);
-    final textChunks = _chunkingService.chunkPages(pages);
 
+    // Normaliza texto bruto para markdown estruturado
+    final markdown = _normalizer.normalize(pages);
+
+    // Chunking sobre o markdown normalizado (tratado como página única)
+    final markdownPages = [
+      PdfPageResult(pageNumber: 1, text: markdown),
+    ];
+    final textChunks = _chunkingService.chunkPages(markdownPages);
+
+    return _persistDocument(
+      filename: filename,
+      sourcePath: sourcePath,
+      chunks: textChunks,
+    );
+  }
+
+  /// Ingere um arquivo Markdown: conteúdo já no formato final → chunking direto.
+  /// Retorna o [Document] criado com seu ID.
+  Future<Document> ingestMarkdown({
+    required Uint8List bytes,
+    required String filename,
+    String? sourcePath,
+  }) async {
+    final content = utf8.decode(bytes);
+
+    // Markdown já está no formato final — chunking direto com page null
+    final textChunks = _chunkingService.chunkPages([
+      PdfPageResult(pageNumber: 0, text: content),
+    ]);
+
+    // Usar page null para chunks de markdown (arquivo inteiro)
+    final chunksWithNullPage = textChunks
+        .map((c) => TextChunk(page: 0, content: c.content))
+        .toList();
+
+    return _persistDocument(
+      filename: filename,
+      sourcePath: sourcePath,
+      chunks: chunksWithNullPage,
+      useNullPage: true,
+    );
+  }
+
+  /// Persiste documento e chunks no banco.
+  Future<Document> _persistDocument({
+    required String filename,
+    String? sourcePath,
+    required List<TextChunk> chunks,
+    bool useNullPage = false,
+  }) async {
     final now = DateTime.now();
 
     final docId = await _db.insert('documents', {
@@ -40,10 +95,10 @@ class DocumentService {
       'imported_at': now.toIso8601String(),
     });
 
-    for (final chunk in textChunks) {
+    for (final chunk in chunks) {
       await _db.insert('chunks', {
         'document_id': docId,
-        'page': chunk.page,
+        'page': useNullPage ? null : chunk.page,
         'content': chunk.content,
         'created_at': now.toIso8601String(),
       });

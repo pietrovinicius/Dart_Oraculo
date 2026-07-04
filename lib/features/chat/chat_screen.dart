@@ -174,7 +174,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _importDocument() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['pdf', 'md'],
     );
 
     if (result == null || result.files.isEmpty) return;
@@ -186,11 +186,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       final bytes = file.bytes ?? await _readFileBytes(file.path!);
-      await _documentService?.ingestPdf(
-        bytes: bytes,
-        filename: file.name,
-        sourcePath: file.path,
-      );
+      if (file.name.endsWith('.md')) {
+        await _documentService?.ingestMarkdown(
+          bytes: bytes,
+          filename: file.name,
+          sourcePath: file.path,
+        );
+      } else {
+        await _documentService?.ingestPdf(
+          bytes: bytes,
+          filename: file.name,
+          sourcePath: file.path,
+        );
+      }
       await _refreshDocumentCount();
 
       if (mounted) {

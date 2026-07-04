@@ -97,3 +97,39 @@ Este documento registra as decisões arquiteturais do Dart Oráculo com a justif
 **Decisão:** Coluna `chunks_used` em `messages` armazena IDs dos chunks usados para gerar cada resposta.
 
 **Razão:** Permite a faixa de citação mostrar exatamente quais documentos e trechos foram consultados. Rastreabilidade é critério de pronto da Fase 1 — respostas devem ser "rastreáveis à fonte".
+
+---
+
+## ADR-012: Conformidade de licença Syncfusion
+
+**Decisão:** O pacote `syncfusion_flutter_pdf` requer conformidade com a Community License da Syncfusion para distribuição. A partir da versão 25.x, `SyncfusionLicense.registerLicense()` foi **deprecated** — registro de chave em runtime não é mais necessário. Porém a obrigação de licenciamento (Community ou Comercial) permanece válida para distribuição.
+
+**Razão:** A Syncfusion oferece Community License gratuita para desenvolvedores individuais e empresas com menos de USD 1M de receita e 5 desenvolvedores. O uso em desenvolvimento local não requer ação. Distribuição pública exige registro prévio no programa.
+
+**Obrigações antes de distribuir:**
+1. Registrar-se em https://www.syncfusion.com/products/communitylicense
+2. Manter conformidade com os termos enquanto o pacote estiver no app
+
+**Nota técnica:** Na versão 25.2.7 usada neste projeto, `SyncfusionLicense.registerLicense()` está deprecated com mensagem "License registration is not required now". Não há chamada de registro em `main.dart`.
+
+**Termos completos:** https://www.syncfusion.com/content/downloads/syncfusion_license.pdf
+
+**Revisitar quando:** Migrar para alternativa open-source (ex: `pdf_text` ou `pdfx`) se a dependência da Syncfusion se tornar problemática.
+
+---
+
+## ADR-013: Normalização de PDF para markdown antes do chunking
+
+**Decisão:** O texto bruto extraído do PDF é normalizado para markdown estruturado antes de ser entregue ao chunking. A normalização detecta títulos por heurística (capítulo por dígito colado a maiúscula, seções numeradas, ALL CAPS), converte linhas de sumário em listas, remove watermarks conhecidos, e marca quebras de página.
+
+**Razão:** O texto bruto do syncfusion não preserva formatação. A normalização produz markdown que: (1) é melhor para indexação FTS5 (títulos separados do corpo), (2) melhora a qualidade do contexto enviado à API (estrutura hierárquica), e (3) é o que fica armazenado e indexado, conforme seção 7 da especificação.
+
+**Heurísticas calibradas para:** Material didático/técnico (apostilas, papers, manuais). PDFs com layout de duas colunas ou slides exportados podem ter resultados inferiores.
+
+---
+
+## ADR-014: Ingestão de markdown como formato de entrada direto
+
+**Decisão:** O pipeline de ingestão aceita arquivos `.md` além de `.pdf`. Para markdown, o conteúdo já está no formato final e vai direto para o chunking, sem passar pelo pdf_service nem pelo normalizer.
+
+**Razão:** A especificação sempre previu PDF e markdown como formatos de entrada. Markdown é o formato nativo de notas pessoais (Obsidian, Logseq, etc.), e o público-alvo do app provavelmente já tem uma base de conhecimento em markdown. Chunks de markdown recebem `page: null` no schema, já que o arquivo não tem conceito de página.

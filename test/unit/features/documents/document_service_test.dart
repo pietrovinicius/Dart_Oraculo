@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:dart_oraculo/core/database/migrations.dart';
 import 'package:dart_oraculo/core/services/chunking_service.dart';
+import 'package:dart_oraculo/core/services/markdown_normalizer.dart';
 import 'package:dart_oraculo/core/services/pdf_service.dart';
 import 'package:dart_oraculo/features/documents/document_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,6 +51,7 @@ void main() {
       database: db,
       pdfService: PdfService(),
       chunkingService: ChunkingService(),
+      markdownNormalizer: MarkdownNormalizer(),
     );
   });
 
@@ -143,6 +146,56 @@ void main() {
         "SELECT * FROM chunks_fts WHERE chunks_fts MATCH 'flutter'",
       );
       expect(ftsResult, isEmpty);
+    });
+  });
+
+  group('DocumentService — Markdown', () {
+    test('ingestMarkdown cria documento e chunks', () async {
+      const content = '# Título\n\nPrimeiro parágrafo sobre Dart.\n\n'
+          'Segundo parágrafo com mais informação.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+
+      final doc = await documentService.ingestMarkdown(
+        bytes: bytes,
+        filename: 'notas.md',
+        sourcePath: '/tmp/notas.md',
+      );
+
+      expect(doc.id, isNotNull);
+      expect(doc.filename, equals('notas.md'));
+
+      final chunks = await documentService.getChunksForDocument(doc.id!);
+      expect(chunks, isNotEmpty);
+    });
+
+    test('ingestMarkdown indexa conteúdo no FTS5', () async {
+      const content = 'Flutter é um framework multiplataforma incrível.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+
+      await documentService.ingestMarkdown(
+        bytes: bytes,
+        filename: 'flutter.md',
+      );
+
+      final ftsResult = await db.rawQuery(
+        "SELECT * FROM chunks_fts WHERE chunks_fts MATCH 'flutter'",
+      );
+      expect(ftsResult, isNotEmpty);
+    });
+
+    test('ingestMarkdown chunks com page null para arquivo inteiro', () async {
+      const content = 'Parágrafo único de teste.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+
+      final doc = await documentService.ingestMarkdown(
+        bytes: bytes,
+        filename: 'simples.md',
+      );
+
+      final chunks = await documentService.getChunksForDocument(doc.id!);
+      expect(chunks, isNotEmpty);
+      // page é null para markdown (arquivo inteiro)
+      expect(chunks.first.page, isNull);
     });
   });
 }
