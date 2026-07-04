@@ -323,6 +323,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _streamingResponse = '';
   bool _isStreaming = false;
+  final _thinkingStopwatch = Stopwatch();
 
   Future<void> _sendMessage(String text) async {
     if (_activeConversationId == null || _chatController == null) return;
@@ -356,6 +357,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _streamingResponse = '';
       _stopRequested = false;
     });
+    _thinkingStopwatch.reset();
+    _thinkingStopwatch.start();
+    _startThinkingTimer();
     _scrollToBottom();
 
     try {
@@ -376,6 +380,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       // 3. Carrega mensagens reais do banco (substitui as temporárias)
+      _thinkingStopwatch.stop();
       setState(() => _isStreaming = false);
       await _loadMessages(_activeConversationId!);
     } on AnthropicException catch (e) {
@@ -807,9 +812,24 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  void _startThinkingTimer() {
+    Future.doWhile(() async {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      if (!_isStreaming || !mounted) return false;
+      setState(() {}); // Rebuild para atualizar cronômetro
+      return true;
+    });
+  }
+
+  String _formatElapsed(Duration d) {
+    final seconds = d.inSeconds;
+    if (seconds < 60) return '${seconds}s';
+    return '${seconds ~/ 60}m ${seconds % 60}s';
+  }
+
   Widget _buildStreamingBubble() {
     if (_streamingResponse.isEmpty) {
-      // Indicador de "pensando" — dots animados
+      final elapsed = _thinkingStopwatch.elapsed;
       return Align(
         alignment: Alignment.centerLeft,
         child: Container(
@@ -835,7 +855,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                'Pensando...',
+                'Pensando... ${_formatElapsed(elapsed)}',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: AppColors.textMuted,
                   fontStyle: FontStyle.italic,

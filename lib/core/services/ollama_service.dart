@@ -106,7 +106,7 @@ class OllamaService implements GenerationService {
       request.body = body;
 
       final streamedResponse = await _httpClient.send(request)
-          .timeout(const Duration(seconds: 120));
+          .timeout(const Duration(minutes: 10));
 
       if (streamedResponse.statusCode != 200) {
         final responseBody = await streamedResponse.stream.bytesToString();
