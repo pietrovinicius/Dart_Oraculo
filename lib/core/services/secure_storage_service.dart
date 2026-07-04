@@ -17,7 +17,9 @@ class SecureStorageService {
               mOptions: MacOsOptions(
                 useDataProtectionKeyChain: false,
               ),
-            );
+            ),
+        // Se storage foi injetado explicitamente (testes), não usa file fallback
+        _useFileFallback = storage == null && testStore == null;
 
   static const _tag = 'SecureStorage';
   final FlutterSecureStorage _storage;
@@ -25,7 +27,12 @@ class SecureStorageService {
   /// Para testes — se não-null, usa este mapa em vez de Keychain/fallback.
   final Map<String, String>? testStore;
 
-  bool _useFileFallback = false;
+  // TODO(auth): voltar para `storage == null` quando app tiver code signing.
+  // Em dev, Keychain pede senha do macOS a cada recompilação.
+  // Quando storage==null (produção), usa file fallback para evitar prompt.
+  // Quando storage é injetado (testes), usa o storage injetado diretamente.
+  // ignore: prefer_final_fields
+  bool _useFileFallback;
   Map<String, String>? _fileCache;
 
   // --- API Key ---
