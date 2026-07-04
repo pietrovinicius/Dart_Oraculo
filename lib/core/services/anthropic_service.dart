@@ -42,7 +42,7 @@ class AnthropicService {
     required List<Map<String, String>> history,
     required String model,
   }) {
-    final systemPrompt = 'Você é o Oráculo, um assistente de conhecimento pessoal. '
+    final systemPrompt = 'Você é o Dart Oráculo, um assistente de conhecimento pessoal. '
         'Responda com base exclusivamente no contexto fornecido abaixo. '
         'Se a informação não estiver no contexto, diga que não encontrou nos documentos.\n\n'
         '--- CONTEXTO ---\n$context\n--- FIM DO CONTEXTO ---';
