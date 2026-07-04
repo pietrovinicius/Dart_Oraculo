@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
-/// Input de texto do chat com botão de enviar.
+/// Input de texto do chat com Shift+Enter para nova linha, Enter para enviar.
+/// Mostra botão Stop durante streaming.
 class ChatInput extends StatefulWidget {
   const ChatInput({
     super.key,
     required this.onSend,
     this.enabled = true,
+    this.isStreaming = false,
+    this.onStop,
   });
 
   final void Function(String message) onSend;
   final bool enabled;
+  final bool isStreaming;
+  final VoidCallback? onStop;
 
   @override
   State<ChatInput> createState() => _ChatInputState();
@@ -46,32 +52,51 @@ class _ChatInputState extends State<ChatInput> {
         border: Border(top: BorderSide(color: AppColors.divider)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              enabled: widget.enabled,
-              style: AppTextStyles.bodyLarge,
-              decoration: const InputDecoration(
-                hintText: 'Pergunte ao Oráculo...',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+            child: KeyboardListener(
+              focusNode: FocusNode(),
+              onKeyEvent: (event) {
+                if (event is KeyDownEvent &&
+                    event.logicalKey == LogicalKeyboardKey.enter &&
+                    !HardwareKeyboard.instance.isShiftPressed) {
+                  _handleSend();
+                }
+              },
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                enabled: widget.enabled,
+                style: AppTextStyles.bodyLarge,
+                decoration: const InputDecoration(
+                  hintText: 'Pergunte ao Oráculo... (Shift+Enter para nova linha)',
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
+                maxLines: 5,
+                minLines: 1,
+                textInputAction: TextInputAction.newline,
               ),
-              maxLines: null,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _handleSend(),
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.send_rounded),
-            color: AppColors.accentOrange,
-            onPressed: widget.enabled ? _handleSend : null,
-          ),
+          if (widget.isStreaming)
+            IconButton(
+              icon: const Icon(Icons.stop_circle_outlined),
+              color: AppColors.error,
+              tooltip: 'Parar geração',
+              onPressed: widget.onStop,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.send_rounded),
+              color: AppColors.accentOrange,
+              onPressed: widget.enabled ? _handleSend : null,
+            ),
         ],
       ),
     );

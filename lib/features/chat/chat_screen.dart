@@ -51,6 +51,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = false;
   bool _sidebarVisible = true;
   String _selectedModel = AppConfig.defaultModel;
+  final _scrollController = ScrollController();
+  bool _stopRequested = false;
 
   @override
   void initState() {
@@ -251,7 +253,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _isLoading = true;
       _isStreaming = true;
       _streamingResponse = '';
+      _stopRequested = false;
     });
+    _scrollToBottom();
 
     try {
       // 2. Streaming da resposta token a token
@@ -262,8 +266,12 @@ class _ChatScreenState extends State<ChatScreen> {
         collectionId: _activeCollectionId,
         collectionInstructions: _activeCollection?.instructions,
       )) {
+        if (_stopRequested) break;
         _streamingResponse += token;
-        if (mounted) setState(() {});
+        if (mounted) {
+          setState(() {});
+          _scrollToBottom();
+        }
       }
 
       // 3. Carrega mensagens reais do banco (substitui as temporárias)
@@ -476,6 +484,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ChatInput(
                   onSend: _sendMessage,
                   enabled: !_isLoading && !_isImporting && _activeConversationId != null,
+                  isStreaming: _isStreaming,
+                  onStop: () => setState(() => _stopRequested = true),
                 ),
               ],
             ),
@@ -550,12 +560,53 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Importe documentos e pergunte ao Oráculo',
+            'Importe documentos e pergunte ao Dart Oráculo',
             style: AppTextStyles.bodyMedium,
+          ),
+          const SizedBox(height: 24),
+          // Prompt starters
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildPromptChip('Resuma meus documentos'),
+              _buildPromptChip('O que diz sobre...?'),
+              _buildPromptChip('Compare os conceitos de...'),
+              _buildPromptChip('Quais os pontos principais?'),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildPromptChip(String text) {
+    return ActionChip(
+      label: Text(text, style: AppTextStyles.bodySmall),
+      backgroundColor: AppColors.surfaceLight,
+      side: const BorderSide(color: AppColors.divider),
+      onPressed: () async {
+        if (_activeConversationId == null) {
+          await _createNewConversation();
+        }
+        if (_activeConversationId != null) {
+          _sendMessage(text);
+        }
+      },
+    );
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Widget _buildImportProgress() {
@@ -582,6 +633,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final itemCount = _messages.length + (_isStreaming ? 1 : 0);
 
     return ListView.builder(
+      controller: _scrollController,
       padding: const EdgeInsets.only(top: 16, bottom: 8),
       itemCount: itemCount,
       itemBuilder: (context, index) {
@@ -604,6 +656,7 @@ class _ChatScreenState extends State<ChatScreen> {
               onFeedbackChanged: (isUser || message.id == null)
                   ? null
                   : (value) => _onFeedbackChanged(message.id!, value),
+              timestamp: message.createdAt,
             ),
             if (!isUser && message.id != null)
               CitationStrip(citations: _parseCitations(message)),
