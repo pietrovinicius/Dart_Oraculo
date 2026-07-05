@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/models/image_attachment.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
@@ -97,6 +98,7 @@ class ChatController extends ChangeNotifier {
     required String model,
     int? collectionId,
     String? collectionInstructions,
+    ImageAttachment? image,
   }) async* {
     LoggerService.instance.info(_tag, 'askQuestion(conv=$conversationId, model=$model, collection=$collectionId, q="${question.length > 50 ? question.substring(0, 50) : question}...")');
 
@@ -151,6 +153,7 @@ class ChatController extends ChangeNotifier {
       'content': question,
       'model_used': null,
       'chunks_used': null,
+      'image_path': image?.path,
       'created_at': now.toIso8601String(),
     });
 
@@ -160,6 +163,7 @@ class ChatController extends ChangeNotifier {
       systemPrompt: context,
       history: history,
       question: question,
+      images: image != null ? [image] : null,
     )) {
       responseBuffer.write(token);
       yield token;

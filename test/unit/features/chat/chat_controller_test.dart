@@ -25,7 +25,7 @@ void main() {
         version: 4,
         singleInstance: false,
         onCreate: (db, version) async {
-          for (final sql in Migrations.allV4) {
+          for (final sql in Migrations.allV5) {
             await db.execute(sql);
           }
         },

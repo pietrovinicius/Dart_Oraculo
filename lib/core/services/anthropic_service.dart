@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import '../models/image_attachment.dart';
 import 'generation_service.dart';
 import 'logger_service.dart';
 
@@ -45,15 +46,36 @@ class AnthropicService implements GenerationService {
     required String context,
     required List<Map<String, String>> history,
     required String model,
+    List<ImageAttachment>? images,
   }) {
     final systemPrompt = 'Você é o Dart Oráculo, um assistente de conhecimento pessoal. '
         'Responda com base exclusivamente no contexto fornecido abaixo. '
         'Se a informação não estiver no contexto, diga que não encontrou nos documentos.\n\n'
         '--- CONTEXTO ---\n$context\n--- FIM DO CONTEXTO ---';
 
+    // Monta content da mensagem do user (com ou sem imagem)
+    final dynamic userContent;
+    if (images != null && images.isNotEmpty) {
+      final contentBlocks = <Map<String, dynamic>>[];
+      for (final img in images) {
+        contentBlocks.add({
+          'type': 'image',
+          'source': {
+            'type': 'base64',
+            'media_type': img.mediaType,
+            'data': base64Encode(img.bytes),
+          },
+        });
+      }
+      contentBlocks.add({'type': 'text', 'text': userMessage});
+      userContent = contentBlocks;
+    } else {
+      userContent = userMessage;
+    }
+
     final messages = <Map<String, dynamic>>[
       ...history,
-      {'role': 'user', 'content': userMessage},
+      {'role': 'user', 'content': userContent},
     ];
 
     return {
@@ -114,6 +136,7 @@ class AnthropicService implements GenerationService {
     required String context,
     required List<Map<String, String>> history,
     required String model,
+    List<ImageAttachment>? images,
   }) async* {
     LoggerService.instance.info(_tag, 'sendMessage() → model=$model, apiKey=${_apiKey.length > 10 ? "${_apiKey.substring(0, 10)}..." : "[EMPTY]"}');
 
@@ -127,6 +150,7 @@ class AnthropicService implements GenerationService {
       context: context,
       history: history,
       model: model,
+      images: images,
     );
 
     LoggerService.instance.info(_tag, 'POST ${AppConfig.anthropicBaseUrl}');
@@ -182,12 +206,14 @@ class AnthropicService implements GenerationService {
     required String systemPrompt,
     required List<Map<String, String>> history,
     required String question,
+    List<ImageAttachment>? images,
   }) {
     return sendMessage(
       userMessage: question,
       context: systemPrompt,
       history: history,
       model: model,
+      images: images,
     );
   }
 }

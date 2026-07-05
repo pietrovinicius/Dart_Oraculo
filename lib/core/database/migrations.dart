@@ -164,4 +164,21 @@ class Migrations {
     ...allV3,
     addDescriptionToDocuments,
   ];
+
+  // --- V5: image_path em messages ---
+
+  static const String addImagePathToMessages = '''
+    ALTER TABLE messages ADD COLUMN image_path TEXT;
+  ''';
+
+  /// Migrations incrementais v4 → v5.
+  static List<String> get upgradeV4toV5 => [
+    addImagePathToMessages,
+  ];
+
+  /// Fresh install completo (v5).
+  static List<String> get allV5 => [
+    ...allV4,
+    addImagePathToMessages,
+  ];
 }

@@ -7,13 +7,18 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
+
 import '../../core/config/app_config.dart';
 import '../../core/config/app_routes.dart';
 import '../../core/database/database_helper.dart';
+import '../../core/models/image_attachment.dart';
 import '../../core/services/anthropic_service.dart';
 import '../../core/services/chunking_service.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
+import '../../core/services/image_resize_service.dart';
 import '../../core/services/ollama_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/secure_storage_service.dart';
@@ -369,7 +374,40 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isStreaming = false;
   final _thinkingStopwatch = Stopwatch();
 
-  Future<void> _sendMessage(String text) async {
+  Future<void> _sendMessageWithImage(
+    String text,
+    Uint8List bytes,
+    String mediaType,
+  ) async {
+    // Redimensiona
+    final resized = await ImageResizeService.resize(bytes);
+
+    // Salva em disco
+    final appDir = await getApplicationSupportDirectory();
+    final imagesDir = io.Directory('${appDir.path}/chat_images');
+    if (!imagesDir.existsSync()) {
+      imagesDir.createSync(recursive: true);
+    }
+    final filename = '${const Uuid().v4()}.png';
+    final filePath = '${imagesDir.path}/$filename';
+    await io.File(filePath).writeAsBytes(resized);
+
+    // Texto default se vazio
+    final question = text.isEmpty ? 'descreva e analise esta imagem' : text;
+
+    final attachment = ImageAttachment(
+      bytes: resized,
+      mediaType: mediaType,
+      path: filePath,
+    );
+
+    _sendMessageInternal(question, image: attachment);
+  }
+
+  Future<void> _sendMessage(String text) =>
+      _sendMessageInternal(text);
+
+  Future<void> _sendMessageInternal(String text, {ImageAttachment? image}) async {
     if (_activeConversationId == null || _chatController == null) return;
 
     final apiKey = await _storageService.getApiKey();
@@ -394,6 +432,7 @@ class _ChatScreenState extends State<ChatScreen> {
           conversationId: _activeConversationId!,
           role: 'user',
           content: text,
+          imagePath: image?.path,
           createdAt: DateTime.now(),
         ),
       ];
@@ -415,6 +454,7 @@ class _ChatScreenState extends State<ChatScreen> {
         model: _selectedModel,
         collectionId: _activeCollectionId,
         collectionInstructions: _activeCollection?.instructions,
+        image: image,
       )) {
         if (_stopRequested) break;
         _streamingResponse += token;
@@ -675,6 +715,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 // Input
                 ChatInput(
                   onSend: _sendMessage,
+                  onSendWithImage: _sendMessageWithImage,
                   enabled: !_isLoading && !_isImporting && _activeConversationId != null,
                   isStreaming: _isStreaming,
                   onStop: () => setState(() => _stopRequested = true),
@@ -936,6 +977,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ? null
                   : (value) => _onFeedbackChanged(message.id!, value),
               timestamp: message.createdAt,
+              imagePath: message.imagePath,
             ),
             if (!isUser && message.id != null)
               CitationStrip(citations: _parseCitations(message)),

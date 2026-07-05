@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/image_attachment.dart';
 import 'generation_service.dart';
 import 'logger_service.dart';
 
@@ -84,16 +85,22 @@ class OllamaService implements GenerationService {
     required String systemPrompt,
     required List<Map<String, String>> history,
     required String question,
+    List<ImageAttachment>? images,
   }) async* {
     LoggerService.instance.info(_tag, 'streamResponse(model=$model)');
 
     // Verifica disponibilidade antes de cada chamada
     await _checkAvailability();
 
+    final userMsg = <String, dynamic>{'role': 'user', 'content': question};
+    if (images != null && images.isNotEmpty) {
+      userMsg['images'] = images.map((i) => base64Encode(i.bytes)).toList();
+    }
+
     final messages = <Map<String, dynamic>>[
       {'role': 'system', 'content': systemPrompt},
       ...history,
-      {'role': 'user', 'content': question},
+      userMsg,
     ];
 
     final body = jsonEncode({

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -17,6 +19,7 @@ class MessageBubble extends StatelessWidget {
     this.onFeedbackChanged,
     this.timestamp,
     this.onEdit,
+    this.imagePath,
   });
 
   final String content;
@@ -26,6 +29,7 @@ class MessageBubble extends StatelessWidget {
   final void Function(String? value)? onFeedbackChanged;
   final DateTime? timestamp;
   final void Function(String newText)? onEdit;
+  final String? imagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +54,20 @@ class MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Miniatura da imagem anexada (se presente)
+            if (isUser && imagePath != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.file(
+                  File(imagePath!),
+                  width: 200,
+                  height: 150,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             // Conteúdo — markdown para assistant, texto selecionável para user
             if (isUser)
               SelectableText(content, style: AppTextStyles.bodyLarge)
