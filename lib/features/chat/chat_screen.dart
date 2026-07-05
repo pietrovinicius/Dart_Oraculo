@@ -217,6 +217,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages = msgs;
         _feedbacks = feedbacks;
       });
+      _scrollToBottom();
     }
   }
 
