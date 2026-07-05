@@ -5,6 +5,39 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.17.1] - 2026-07-05
+
+### Segurança
+- **secure_storage_service.dart**: REMOVIDO fallback silencioso para arquivo JSON em texto plano (.secure_store.json). Existia desde v0.8.2. Agora falha de Keychain surfaça como SecureStorageException — nunca grava fora do Keychain.
+
+## [0.17.0] - 2026-07-05
+
+### Corrigido
+- **fts_service.dart**: Bug crítico desde v0.4.0 — `words.join(' OR ')` retornava chunks irrelevantes para qualquer query com mais de um termo. Agora usa AND implícito com priorização de termos técnicos.
+- **fts_service.dart**: Stopwords pt-BR/en (50+) removidas da query FTS5.
+- **fts_service.dart**: Termos com underscore (ADEP_V) preservados como phrase match exata.
+- **fts_service.dart**: Termos ALLCAPS priorizados sobre palavras comuns em queries mistas.
+
+### Adicionado
+- **fts_service.dart**: Busca em cascata: AND técnicos → OR fallback → prefix match como último recurso.
+- **chat_controller.dart**: Logs detalhados — base de conhecimento (docs/chunks), cada chunk com rank + preview, tamanho contexto.
+- **fts_service.dart**: Log da query sanitizada + warning quando query vira vazia.
+- **anthropic_service.dart**: Prompt RAG melhorado com 5 instruções claras:
+  ```
+  1. Responda SOMENTE com base no CONTEXTO abaixo.
+  2. Se a informação não está no contexto, diga claramente:
+     "Não encontrei essa informação nos documentos indexados."
+  3. Cite o documento fonte e página quando possível.
+  4. Se o contexto contém informação parcial, mencione o que encontrou e o que falta.
+  5. NÃO invente informação que não está no contexto.
+  ```
+- **chat_controller.dart**: Contexto formatado com metadados por chunk (fonte, página, relevância).
+
+### Relação com auditoria v0.13.2
+- O item "chips mostrando chunk #ID em vez de filename" (ressalva §2.4) era **parcialmente sintoma** deste bug — com OR retornando chunks genéricos, as citações vinham de documentos irrelevantes. Corrigido na v0.14.0 (lookup de filename) + v0.17.0 (busca retorna chunks corretos).
+- Os 3 itens com ressalva (§2.1 descrição Qwen, §2.7 model_used legado, §2.5 Shift+Enter) eram problemas independentes — não relacionados ao bug de OR na busca.
+- O item reprovado (seleção cross-bubble §2.6) é limitação de UI aceita, não relacionado ao RAG.
+
 ## [0.16.0] - 2026-07-05
 
 ### Adicionado
