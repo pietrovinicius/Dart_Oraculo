@@ -39,7 +39,9 @@ class MessageBubble extends StatelessWidget {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.7,
+          maxWidth: MediaQuery.of(context).size.width * 0.7 < 800
+              ? MediaQuery.of(context).size.width * 0.7
+              : 800,
         ),
         margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
         padding: const EdgeInsets.all(14),
@@ -281,13 +283,19 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
     final code = element.textContent;
-    return _CodeBlockWidget(code: code);
+    // Extrai linguagem do atributo class (ex: 'language-sql')
+    final className = element.attributes['class'] ?? '';
+    final language = className.startsWith('language-')
+        ? className.substring(9).toUpperCase()
+        : null;
+    return _CodeBlockWidget(code: code, language: language);
   }
 }
 
 class _CodeBlockWidget extends StatefulWidget {
-  const _CodeBlockWidget({required this.code});
+  const _CodeBlockWidget({required this.code, this.language});
   final String code;
+  final String? language;
 
   @override
   State<_CodeBlockWidget> createState() => _CodeBlockWidgetState();
@@ -324,6 +332,13 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
             ),
             child: Row(
               children: [
+                if (widget.language != null)
+                  Text(
+                    widget.language!,
+                    style: AppTextStyles.techSmall.copyWith(
+                      color: AppColors.accentOrange,
+                    ),
+                  ),
                 const Spacer(),
                 InkWell(
                   onTap: _copyCode,

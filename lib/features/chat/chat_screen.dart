@@ -925,9 +925,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ],
             ),
-                  // Overlay visual durante drag
+                  // Overlay visual durante drag (faixa inferior sutil)
                   if (_isDragOver)
-                    Positioned.fill(
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 120,
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppColors.accentOrange.withValues(alpha: 0.08),
@@ -935,21 +939,21 @@ class _ChatScreenState extends State<ChatScreen> {
                             color: AppColors.accentOrange.withValues(alpha: 0.5),
                             width: 2,
                           ),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.image_outlined,
-                                  size: 48,
-                                  color: AppColors.accentOrange.withValues(alpha: 0.7)),
-                              const SizedBox(height: 8),
-                              Text('Solte a imagem aqui',
-                                  style: AppTextStyles.bodyLarge.copyWith(
-                                    color: AppColors.accentOrange)),
-                            ],
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(12),
                           ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.image_outlined,
+                                size: 32,
+                                color: AppColors.accentOrange.withValues(alpha: 0.7)),
+                            const SizedBox(width: 12),
+                            Text('Solte a imagem ou .md aqui',
+                                style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.accentOrange)),
+                          ],
                         ),
                       ),
                     ),

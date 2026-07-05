@@ -240,16 +240,20 @@ class _ChatInputState extends State<ChatInput> {
                     iconSize: 20,
                   ),
                   // Botão microfone (ditado)
-                  IconButton(
-                    icon: Icon(
-                      _isListening ? Icons.mic : Icons.mic_none,
+                  AnimatedScale(
+                    scale: _isListening ? 1.2 : 1.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: IconButton(
+                      icon: Icon(
+                        _isListening ? Icons.mic : Icons.mic_none,
+                      ),
+                      color: _isListening
+                          ? AppColors.accentOrange
+                          : AppColors.textSecondary,
+                      tooltip: _isListening ? 'Parar ditado' : 'Ditado por voz',
+                      onPressed: widget.enabled ? _toggleListening : null,
+                      iconSize: 20,
                     ),
-                    color: _isListening
-                        ? AppColors.accentOrange
-                        : AppColors.textSecondary,
-                    tooltip: _isListening ? 'Parar ditado' : 'Ditado por voz',
-                    onPressed: widget.enabled ? _toggleListening : null,
-                    iconSize: 20,
                   ),
                   Expanded(
                     child: CallbackShortcuts(
@@ -265,15 +269,14 @@ class _ChatInputState extends State<ChatInput> {
                         enabled: widget.enabled,
                         style: AppTextStyles.bodyLarge,
                         decoration: const InputDecoration(
-                          hintText:
-                              'Pergunte ao Oráculo... (Shift+Enter nova linha)',
+                          hintText: 'Pergunte ao Oráculo...',
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
                           ),
                         ),
-                        maxLines: 5,
+                        maxLines: null,
                         minLines: 1,
                         textInputAction: TextInputAction.newline,
                       ),
@@ -289,10 +292,13 @@ class _ChatInputState extends State<ChatInput> {
                       onPressed: widget.onStop,
                     )
                   else
-                    IconButton(
-                      icon: const Icon(Icons.send_rounded),
-                      color: AppColors.accentOrange,
-                      onPressed: widget.enabled ? _handleSend : null,
+                    Opacity(
+                      opacity: widget.enabled ? 1.0 : 0.3,
+                      child: IconButton(
+                        icon: const Icon(Icons.send_rounded),
+                        color: AppColors.accentOrange,
+                        onPressed: widget.enabled ? _handleSend : null,
+                      ),
                     ),
                 ],
               ),
