@@ -1,89 +1,159 @@
 # Plano de Implementação — Melhorias de UX do Chat
 
-**Data:** 2026-07-04  
-**Base:** docs/AUDITORIA_DE_UX_CHAT.md  
+**Data:** 2026-07-05  
+**Base:** docs/auditoria_ux_chat_v0.20_2026-07-05.md  
 **Ordem:** por prioridade e dependência
 
 ---
 
-## Sprint A — Alta Prioridade (impacto imediato)
+## Sprint A — Alta Prioridade (bugs + impacto imediato)
 
-### A1. Citação com filename real
-**Arquivo:** `lib/features/chat/chat_screen.dart` → `_parseCitations()`  
-**Mudança:** Fazer JOIN de chunk_id com chunks→documents para obter filename real.  
-**Atual:** `CitationData(filename: 'chunk #$id')`  
-**Novo:** Query: `SELECT d.filename, c.page FROM chunks c JOIN documents d ON d.id = c.document_id WHERE c.id IN (?)`  
-**Teste:** Atualizar integration test para verificar que citação mostra filename.
+### A1. Fix B2 — Conversa antiga abre no final
+**Arquivo:** `lib/features/chat/chat_screen.dart` → `_loadMessages()`  
+**Mudança:** Após carregar mensagens, chamar `_scrollToBottom()` para posicionar no final (última mensagem).  
+**Teste:** Abrir conversa com 20+ mensagens → deve scrollar ao final automaticamente.
 
-### A2. Retry de mensagem após erro
+### A2. Fix B1 — ScrollController multiple views (melhorar guard)
 **Arquivo:** `lib/features/chat/chat_screen.dart`  
-**Mudança:** Quando a API retorna erro, mostrar botão "Tentar novamente" na posição onde estaria a resposta do assistant. Ao clicar, reenvia a última pergunta.  
-**UI:** Bolha com ícone de erro + texto "Falha ao gerar resposta" + botão "↻ Tentar novamente"  
-**Estado:** Novo campo `_lastError` que guarda a mensagem de erro e a pergunta original.
+**Mudança:** Remover AnimatedSwitcher do ListView (causa 2 views simultâneas durante fade). Usar crossfade no conteúdo externo ou aceitar transição sem animação no ListView.  
+**Alternativa:** Criar novo ScrollController por conversa em vez de reusar um só.
 
-### A3. Scroll-to-bottom button
-**Arquivo:** `lib/features/chat/chat_screen.dart`  
-**Mudança:** `NotificationListener<ScrollNotification>` detecta quando o user scrollou para cima. Mostra `FloatingActionButton` com seta ↓ que chama `_scrollToBottom()`.  
-**Posição:** Canto inferior direito do painel de chat, acima do input.  
-**Visibilidade:** Só aparece quando `scrollController.offset < maxScrollExtent - 100`.
+### A3. Loading visual durante verificação de fidelidade
+**Arquivo:** `lib/features/chat/widgets/message_bubble.dart` + `chat_screen.dart`  
+**Mudança:** Enquanto `_feedbackInProgress` contém o messageId, mostrar CircularProgressIndicator(size: 12) no lugar do ícone de like.  
+**UI:** Ícone like → spinner laranja → ícone like (se aprovado) ou dialog.
+
+### A4. Confirmação antes de excluir conversa
+**Arquivo:** `lib/features/chat/chat_screen.dart` → `_deleteConversation()`  
+**Mudança:** Mostrar AlertDialog "Excluir conversa '{título}'? Esta ação não pode ser desfeita." com [Cancelar] [Excluir].  
+
+### A5. Warning ao editar mensagem
+**Arquivo:** `lib/features/chat/chat_screen.dart` → `_submitEdit()`  
+**Mudança:** Antes de deletar mensagens posteriores, mostrar dialog: "Editar esta mensagem vai remover {N} mensagens posteriores. Continuar?"  
 
 ---
 
 ## Sprint B — Média Prioridade (qualidade percebida)
 
-### B1. Input focus visual
-**Arquivo:** `lib/features/chat/widgets/chat_input.dart`  
-**Mudança:** Adicionar `focusedBorder` com cor `AppColors.accentOrange` no Container do input quando o TextField está focado. Usar `ValueListenableBuilder` no `_focusNode` para detectar foco.
-
-### B2. Editar mensagem do user
-**Arquivo:** `lib/features/chat/widgets/message_bubble.dart` + `chat_screen.dart` + `chat_controller.dart`  
-**Mudança:**
-1. Ícone de editar (lápis) aparece no hover/tap da bolha do user
-2. Ao clicar, troca o conteúdo da bolha por um TextField editável com o texto original
-3. Ao confirmar, deleta mensagens subsequentes (assistant + user posteriores) e reenvia
-4. Controller: novo método `editAndResend(conversationId, messageId, newText)`  
-**Complexidade:** Média — precisa deletar mensagens do banco e re-perguntar.
-
----
-
-## Sprint C — Baixa Prioridade (polish visual)
-
-### C1. Separador de data
-**Arquivo:** `lib/features/chat/chat_screen.dart` → `_buildMessageList()`  
-**Mudança:** Antes de renderizar cada mensagem, verificar se a data mudou em relação à anterior. Se sim, inserir um widget divider com texto ("Hoje", "Ontem", ou "DD/MM/YYYY").
-
-### C2. Ícone do motor
+### B1. Respostas longas — collapse/expand
 **Arquivo:** `lib/features/chat/widgets/message_bubble.dart`  
-**Mudança:** Ao lado do texto do modelo no footer, adicionar ícone:
-- Sonnet/Opus: `Icons.cloud_outlined` (laranja)
-- Qwen Local: `Icons.computer_outlined` (verde)
+**Mudança:** Se conteúdo > 500 chars, mostrar apenas primeiras 300 chars + botão "Ver mais ▼". Ao expandir, mostra tudo + botão "Ver menos ▲".  
+**Exceção:** Nunca colapsa durante streaming.
 
-### C3. Transição suave ao trocar conversa
+### B2. Code block com detecção de linguagem
+**Arquivo:** `lib/features/chat/widgets/message_bubble.dart` → `_CodeBlockBuilder`  
+**Mudança:** Extrair info de linguagem do bloco markdown (````sql`, ````python`). Exibir no header do code block.  
+**Fonte:** `element.attributes['class']` do markdown parser.
+
+### B3. Citação clicável
+**Arquivo:** `lib/features/chat/widgets/citation_strip.dart`  
+**Mudança:** Ao clicar no chip de citação, abrir dialog com preview do chunk completo. Ou navegar para a biblioteca com o documento destacado.
+
+### B4. Busca/filtro de conversas na sidebar
+**Arquivo:** `lib/features/chat/widgets/sidebar.dart`  
+**Mudança:** TextField de busca acima da lista de conversas. Filtra por título em tempo real.
+
+### B5. Drag overlay menor
 **Arquivo:** `lib/features/chat/chat_screen.dart`  
-**Mudança:** Wrap o ListView com `AnimatedSwitcher(duration: 200ms)` usando `_activeConversationId` como key. Dá fade-in ao trocar.
+**Mudança:** Overlay cobre só a área inferior (input + 30%) em vez de 100%. Ou usar borda pontilhada sem cobrir conteúdo.
 
-### C4. Empty state de conversa nova
-**Arquivo:** `lib/features/chat/chat_screen.dart` → `_buildMessageList()`  
-**Mudança:** Quando `_messages.isEmpty && !_isStreaming`, mostrar o mesmo empty state que já existe (ícone + prompt starters), mas dentro do painel de chat (não só quando não há conversa selecionada).
+### B6. Labels visuais nos botões 📎 e 🎤
+**Arquivo:** `lib/features/chat/widgets/chat_input.dart`  
+**Mudança:** Adicionar texto compacto abaixo ou ao lado dos ícones em telas largas. Ou usar chips: `[📎 Imagem]` `[🎤 Ditado]`.
 
-### C5. Feedback tátil no like/dislike
-**Arquivo:** `lib/features/chat/widgets/message_bubble.dart` → `_FeedbackButton`  
-**Mudança:** Wrap o Icon com `AnimatedScale` — ao clicar, scale para 1.3 por 150ms, depois volta a 1.0. Cor transition já acontece pelo rebuild.
+### B7. Like duplo — feedback visual imediato
+**Arquivo:** `lib/features/chat/chat_screen.dart`  
+**Mudança:** Ao clicar like, mudar ícone para filled imediatamente (optimistic UI). Se verificação falhar, reverter. Já parcialmente implementado (`setState(() => _feedbacks[messageId] = value)`).
 
 ---
 
-## Ordem de Execução
+## Sprint C — Baixa Prioridade (polish)
 
-1. A1 (citação real) — independente
-2. A2 (retry) — independente
-3. A3 (scroll-to-bottom) — independente
-4. B1 (input focus) — independente
-5. C1 (separador data) — independente
-6. C2 (ícone motor) — independente
-7. C4 (empty state conversa) — independente
-8. C5 (feedback tátil) — independente
-9. C3 (transição suave) — independente
-10. B2 (editar mensagem) — mais complexo, por último
+### C1. maxLines dinâmico no input
+**Arquivo:** `lib/features/chat/widgets/chat_input.dart`  
+**Mudança:** `maxLines: null` com `constraints: BoxConstraints(maxHeight: 200)` para permitir scroll interno em queries muito longas.
+
+### C2. Hint text mais curto
+**Arquivo:** `lib/features/chat/widgets/chat_input.dart`  
+**Mudança:** Hint: `"Pergunte ao Oráculo..."`. Mover `"(Shift+Enter nova linha)"` para tooltip do campo ou primeiro uso.
+
+### C3. Bolha max-width responsiva
+**Arquivo:** `lib/features/chat/widgets/message_bubble.dart`  
+**Mudança:** `maxWidth: min(MediaQuery.width * 0.7, 800)` — cap absoluto em telas largas.
+
+### C4. Scroll-to-bottom FAB margem
+**Arquivo:** `lib/features/chat/chat_screen.dart`  
+**Mudança:** `bottom: 80` (acima do input) em vez de `bottom: 16` que pode sobrepor última mensagem.
+
+### C5. Indicador áudio no ditado
+**Arquivo:** `lib/features/chat/widgets/chat_input.dart`  
+**Mudança:** Quando `_isListening`, adicionar AnimatedContainer com pulsação (scale animation) no ícone do mic.
+
+### C6. Conversas agrupadas por data na sidebar
+**Arquivo:** `lib/features/chat/widgets/sidebar.dart`  
+**Mudança:** Antes de renderizar cada conversa, verificar se mudou de dia. Inserir header "Hoje", "Ontem", "DD/MM".
+
+### C7. Indicador de conversa com anexo na sidebar
+**Arquivo:** `lib/features/chat/widgets/sidebar.dart`  
+**Mudança:** Badge "📎" no ListTile da conversa quando `conversation_context_attachments` tem registros.
+
+### C8. Timestamp com data em conversas longas
+**Arquivo:** `lib/features/chat/widgets/message_bubble.dart`  
+**Mudança:** Se separador de data foi renderizado acima, timestamp mostra só hora. Se não (mesma view), mostra "05/07 15:34".
+
+### C9. Botão send estado disabled visual
+**Arquivo:** `lib/features/chat/widgets/chat_input.dart`  
+**Mudança:** Quando disabled, ícone send com opacity 0.3 explícito + cor textMuted.
+
+### C10. Validação nome coleção
+**Arquivo:** `lib/features/chat/widgets/sidebar.dart` (ou dialog de criação)  
+**Mudança:** Desabilitar botão "Criar" quando TextField está vazio.
+
+---
+
+## Sprint D — Melhores Práticas
+
+### D1. Accessibility — Semantics labels
+**Arquivos:** todos os widgets  
+**Mudança:** Adicionar `Semantics(label: ...)` em botões de ação, like/dislike, copiar, editar, mic, send.
+
+### D2. Keyboard navigation
+**Arquivo:** `lib/features/chat/widgets/message_bubble.dart`  
+**Mudança:** Botões de ação focáveis via Tab. `FocusTraversalGroup` no footer.
+
+### D3. Rate limiting visual
+**Arquivo:** `lib/features/chat/chat_screen.dart`  
+**Mudança:** Quando API retorna 429, mostrar SnackBar específico: "Limite de requisições atingido. Aguarde X segundos." com countdown.
+
+### D4. Sidebar auto-collapse em telas pequenas
+**Arquivo:** `lib/features/chat/chat_screen.dart`  
+**Mudança:** `MediaQuery.of(context).size.width < 1024` → sidebar começa colapsada.
+
+### D5. Empty states diferenciados
+**Arquivos:** `chat_screen.dart`  
+**Mudança:** 3 visuais diferentes: sem coleção selecionada, sem conversa, sem documentos na coleção.
+
+### D6. Feedback de sucesso ao criar coleção
+**Arquivo:** sidebar ou dialog de criação  
+**Mudança:** SnackBar "Coleção '{nome}' criada" após inserir.
+
+---
+
+## Ordem de Execução Sugerida
+
+| Ordem | Item | Esforço | Impacto |
+|---|---|---|---|
+| 1 | A1 (scroll ao final) | 30min | Alto |
+| 2 | A4 (confirmar excluir) | 30min | Alto |
+| 3 | A3 (loading like) | 1h | Alto |
+| 4 | A5 (warning editar) | 30min | Alto |
+| 5 | A2 (ScrollController fix) | 2h | Alto |
+| 6 | B6 (labels botões) | 30min | Médio |
+| 7 | B2 (code language) | 1h | Médio |
+| 8 | B4 (busca conversas) | 2h | Médio |
+| 9 | B1 (collapse respostas) | 2h | Médio |
+| 10 | C1-C10 | 30min cada | Baixo |
+| 11 | D1-D6 | 1h cada | Best practice |
 
 ---
 
@@ -91,9 +161,9 @@
 
 Após cada item:
 - `flutter analyze` limpo
-- `flutter test` — todos passando
-- Commit individual com descrição do que mudou
+- `flutter test` passando
+- Commit individual com changelog fragment
 
-Após todos:
-- Fragmento de changelog
+Após sprint completo:
 - Build macOS para confirmar
+- Teste manual dos fluxos afetados
