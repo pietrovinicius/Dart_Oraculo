@@ -442,15 +442,23 @@ class _ChatScreenState extends State<ChatScreen> {
 
     if (details.files.isEmpty) return;
     final file = details.files.first;
-
-    // Valida extensão
     final ext = file.name.split('.').last.toLowerCase();
-    const validExts = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
-    if (!validExts.contains(ext)) {
+
+    // Markdown → diálogo de destino
+    if (ext == 'md') {
+      final bytes = await file.readAsBytes();
+      final content = String.fromCharCodes(bytes);
+      _showMdDestinationDialog(file.name, content);
+      return;
+    }
+
+    // Imagens
+    const imageExts = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
+    if (!imageExts.contains(ext)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Formato inválido: .$ext — aceito: JPG, PNG, GIF, WebP'),
+            content: Text('Formato inválido: .$ext — aceito: JPG, PNG, GIF, WebP, MD'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -458,7 +466,6 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // Lê bytes e reusar fluxo existente
     final bytes = await file.readAsBytes();
     final mediaType = ext == 'jpg' || ext == 'jpeg'
         ? 'image/jpeg'
@@ -469,6 +476,75 @@ class _ChatScreenState extends State<ChatScreen> {
                 : 'image/png';
 
     _sendMessageWithImage('', Uint8List.fromList(bytes), mediaType);
+  }
+
+  Future<void> _showMdDestinationDialog(String filename, String content) async {
+    if (!mounted || _activeConversationId == null) return;
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Destino do arquivo', style: AppTextStyles.bodyLarge),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(filename, style: AppTextStyles.techMedium.copyWith(
+              color: AppColors.accentOrange)),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Text('📚', style: TextStyle(fontSize: 24)),
+              title: const Text('Adicionar à biblioteca', style: AppTextStyles.bodyMedium),
+              subtitle: const Text('Indexa permanentemente na coleção.\nDisponível em todas as conversas.',
+                  style: AppTextStyles.techSmall),
+              onTap: () => Navigator.pop(ctx, 'library'),
+            ),
+            const Divider(color: AppColors.divider),
+            ListTile(
+              leading: const Text('📎', style: TextStyle(fontSize: 24)),
+              title: const Text('Usar nesta conversa', style: AppTextStyles.bodyMedium),
+              subtitle: const Text('Contexto de trabalho temporário.\nSó nesta conversa.',
+                  style: AppTextStyles.techSmall),
+              onTap: () => Navigator.pop(ctx, 'conversation'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (choice == 'library') {
+      // Fluxo existente de ingestão
+      await _documentService?.ingestMarkdown(
+        bytes: Uint8List.fromList(content.codeUnits),
+        filename: filename,
+        collectionId: _activeCollectionId,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Documento adicionado à biblioteca'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+      await _refreshDocumentCount();
+    } else if (choice == 'conversation') {
+      await _chatController?.addContextAttachment(
+        _activeConversationId!,
+        filename,
+        content,
+      );
+      if (mounted) {
+        setState(() {}); // Refresh indicador
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Documento de trabalho anexado à conversa'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _sendMessageWithImage(
@@ -880,6 +956,45 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             onPressed: () => setState(() => _sidebarVisible = !_sidebarVisible),
           ),
+          // Indicador de docs de trabalho
+          if (_activeConversationId != null)
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _chatController?.getContextAttachments(_activeConversationId!) ??
+                  Future.value([]),
+              builder: (context, snapshot) {
+                final atts = snapshot.data ?? [];
+                if (atts.isEmpty) return const SizedBox.shrink();
+                return PopupMenuButton<int>(
+                  tooltip: 'Documentos de trabalho',
+                  child: Chip(
+                    avatar: const Icon(Icons.attach_file, size: 14,
+                        color: AppColors.accentOrange),
+                    label: Text('${atts.length} doc${atts.length > 1 ? 's' : ''}',
+                        style: AppTextStyles.techSmall),
+                    backgroundColor: AppColors.surfaceLight,
+                    side: const BorderSide(color: AppColors.divider),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  itemBuilder: (_) => atts.map((att) => PopupMenuItem<int>(
+                    value: att['id'] as int,
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(
+                          att['filename'] as String,
+                          style: AppTextStyles.bodySmall,
+                        )),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.close, size: 14, color: AppColors.error),
+                      ],
+                    ),
+                  )).toList(),
+                  onSelected: (attId) async {
+                    await _chatController?.removeContextAttachment(attId);
+                    if (mounted) setState(() {});
+                  },
+                );
+              },
+            ),
           const Spacer(),
           // Seletor de modelo
           DropdownButton<String>(
