@@ -86,6 +86,20 @@ class _ChatInputState extends State<ChatInput> {
     });
   }
 
+  KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
+    // Só intercepta Cmd+V key down
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final meta = HardwareKeyboard.instance.isMetaPressed;
+    if (!meta || event.logicalKey != LogicalKeyboardKey.keyV) {
+      return KeyEventResult.ignored;
+    }
+    // Verifica clipboard assincronamente
+    _handlePaste();
+    // Retorna ignored para permitir que o paste de texto funcione normalmente
+    // se não houver imagem. _handlePaste() vai sobrepor com o anexo se encontrar imagem.
+    return KeyEventResult.ignored;
+  }
+
   Future<void> _handlePaste() async {
     final clipService =
         widget.clipboardImageService ?? ClipboardImageService();
@@ -96,7 +110,7 @@ class _ChatInputState extends State<ChatInput> {
         _attachedMediaType = 'image/png';
       });
     }
-    // Se não tem imagem, não intercepta — colar texto funciona normalmente
+    // Se não tem imagem, não intercepta — texto cola normalmente pelo TextField
   }
 
   void _removeAttachment() {
@@ -184,12 +198,10 @@ class _ChatInputState extends State<ChatInput> {
                       bindings: {
                         const SingleActivator(LogicalKeyboardKey.enter):
                             _handleSend,
-                        const SingleActivator(
-                          LogicalKeyboardKey.keyV,
-                          meta: true,
-                        ): _handlePaste,
                       },
-                      child: TextField(
+                      child: Focus(
+                        onKeyEvent: _onKeyEvent,
+                        child: TextField(
                         controller: _controller,
                         focusNode: _focusNode,
                         enabled: widget.enabled,
@@ -207,6 +219,7 @@ class _ChatInputState extends State<ChatInput> {
                         minLines: 1,
                         textInputAction: TextInputAction.newline,
                       ),
+                    ),
                     ),
                   ),
                   const SizedBox(width: 8),
