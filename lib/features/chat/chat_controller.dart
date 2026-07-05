@@ -179,26 +179,43 @@ class ChatController extends ChangeNotifier {
       contextBuffer.writeln();
     }
     // 2b. Injeta documentos de trabalho da conversa (context attachments)
+    //     Limite: soma total de todos os anexos ≤ maxChars (não por anexo isolado)
     final attachments = await getContextAttachments(conversationId);
     if (attachments.isNotEmpty) {
       contextBuffer.writeln();
+      var totalCharsUsed = 0;
+      var injectedCount = 0;
       for (final att in attachments) {
         final attContent = att['content'] as String;
         final attFilename = att['filename'] as String;
+
+        final remaining = maxChars - totalCharsUsed;
+        if (remaining <= 0) {
+          LoggerService.instance.warn(_tag,
+              'Doc trabalho "$attFilename" ignorado — limite total atingido');
+          break;
+        }
+
         final String injected;
-        if (attContent.length > maxChars) {
-          injected = '${attContent.substring(0, maxChars)}\n'
-              '[... documento de trabalho truncado. Total: ${attContent.length} chars.]';
+        if (attContent.length > remaining) {
+          injected = '${attContent.substring(0, remaining)}\n'
+              '[... documento de trabalho truncado. Total: ${attContent.length} chars. '
+              'Limite combinado de ${maxChars} chars atingido.]';
+          totalCharsUsed = maxChars;
         } else {
           injected = attContent;
+          totalCharsUsed += attContent.length;
         }
+
         contextBuffer.writeln('--- DOCUMENTO DE TRABALHO: $attFilename ---');
         contextBuffer.writeln(injected);
         contextBuffer.writeln('--- FIM DOCUMENTO DE TRABALHO ---');
         contextBuffer.writeln();
+        injectedCount++;
       }
       LoggerService.instance.info(_tag,
-          'Docs de trabalho: ${attachments.length} anexos injetados');
+          'Docs de trabalho: $injectedCount/${attachments.length} anexos injetados '
+          '($totalCharsUsed/$maxChars chars)');
     }
 
     final context = contextBuffer.toString();
