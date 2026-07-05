@@ -20,6 +20,7 @@ class SecureStorageService {
             const FlutterSecureStorage(
               mOptions: MacOsOptions(
                 useDataProtectionKeyChain: false,
+                accessibility: KeychainAccessibility.first_unlock,
               ),
             );
 
