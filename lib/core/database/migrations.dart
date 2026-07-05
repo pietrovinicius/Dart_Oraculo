@@ -181,4 +181,27 @@ class Migrations {
     ...allV4,
     addImagePathToMessages,
   ];
+
+  // --- V6: promoted answers ---
+
+  static const String addSourceTypeToChunks = '''
+    ALTER TABLE chunks ADD COLUMN source_type TEXT NOT NULL DEFAULT 'document';
+  ''';
+
+  static const String addOriginalMessageIdToChunks = '''
+    ALTER TABLE chunks ADD COLUMN original_message_id INTEGER;
+  ''';
+
+  /// Migrations incrementais v5 → v6.
+  static List<String> get upgradeV5toV6 => [
+    addSourceTypeToChunks,
+    addOriginalMessageIdToChunks,
+  ];
+
+  /// Fresh install completo (v6).
+  static List<String> get allV6 => [
+    ...allV5,
+    addSourceTypeToChunks,
+    addOriginalMessageIdToChunks,
+  ];
 }

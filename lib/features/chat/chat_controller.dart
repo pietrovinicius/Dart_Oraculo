@@ -237,11 +237,11 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Feedback (like/dislike) ---
+  // --- Feedback (like/dislike) + Promoção RAG ---
 
   /// Grava, alterna ou remove voto de feedback.
-  /// value='like'|'dislike' → grava/alterna. null → remove.
-  /// Se value igual ao existente → remove (toggle off).
+  /// Like → promove resposta como chunk pesquisável.
+  /// Remove like / dislike → reverte promoção.
   Future<void> setFeedback(int messageId, String? value) async {
     LoggerService.instance.info(_tag, 'setFeedback(msg=$messageId, value=$value)');
 
@@ -251,13 +251,20 @@ class ChatController extends ChangeNotifier {
       whereArgs: [messageId],
     );
 
+    final String? previousValue =
+        existing.isNotEmpty ? existing.first['value'] as String : null;
+
     if (value == null) {
-      // Remove
+      // Remove feedback
       await _db.delete(
         'message_feedback',
         where: 'message_id = ?',
         whereArgs: [messageId],
       );
+      // Reverte promoção se tinha like
+      if (previousValue == 'like') {
+        await _revokePromotion(messageId);
+      }
     } else if (existing.isEmpty) {
       // Insere novo
       await _db.insert('message_feedback', {
@@ -265,6 +272,10 @@ class ChatController extends ChangeNotifier {
         'value': value,
         'created_at': DateTime.now().toIso8601String(),
       });
+      // Promove se é like
+      if (value == 'like') {
+        await _promoteAnswer(messageId);
+      }
     } else {
       final currentValue = existing.first['value'] as String;
       if (currentValue == value) {
@@ -274,6 +285,10 @@ class ChatController extends ChangeNotifier {
           where: 'message_id = ?',
           whereArgs: [messageId],
         );
+        // Reverte promoção se era like
+        if (currentValue == 'like') {
+          await _revokePromotion(messageId);
+        }
       } else {
         // Alterna para outro valor
         await _db.update(
@@ -282,9 +297,120 @@ class ChatController extends ChangeNotifier {
           where: 'message_id = ?',
           whereArgs: [messageId],
         );
+        // Se era like e virou dislike → reverte
+        if (currentValue == 'like' && value == 'dislike') {
+          await _revokePromotion(messageId);
+        }
+        // Se era dislike e virou like → promove
+        if (currentValue == 'dislike' && value == 'like') {
+          await _promoteAnswer(messageId);
+        }
       }
     }
     notifyListeners();
+  }
+
+  /// Promove resposta do assistant como chunk pesquisável na coleção.
+  Future<void> _promoteAnswer(int messageId) async {
+    // Busca a mensagem assistant
+    final msgRows = await _db.query(
+      'messages',
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+    if (msgRows.isEmpty) return;
+    final msg = msgRows.first;
+    final conversationId = msg['conversation_id'] as int;
+    final assistantContent = msg['content'] as String;
+
+    // Busca mensagem user anterior (última antes desta)
+    final userRows = await _db.query(
+      'messages',
+      where: 'conversation_id = ? AND id < ? AND role = ?',
+      whereArgs: [conversationId, messageId, 'user'],
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+    final userContent = userRows.isNotEmpty
+        ? userRows.first['content'] as String
+        : '(pergunta não encontrada)';
+
+    // Busca collection_id da conversa
+    final convRows = await _db.query(
+      'conversations',
+      where: 'id = ?',
+      whereArgs: [conversationId],
+    );
+    if (convRows.isEmpty) return;
+    final collectionId = convRows.first['collection_id'] as int?;
+    if (collectionId == null) return;
+
+    // Busca nome da coleção
+    final colRows = await _db.query(
+      'collections',
+      where: 'id = ?',
+      whereArgs: [collectionId],
+    );
+    final collectionName = colRows.isNotEmpty
+        ? colRows.first['name'] as String
+        : 'Desconhecida';
+
+    // Obtém ou cria documento sintético
+    final docId = await _getOrCreatePromotedDocument(collectionId);
+
+    // Monta conteúdo do chunk
+    final now = DateTime.now();
+    final dateStr = '${now.day.toString().padLeft(2, '0')}/'
+        '${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final chunkContent = '[Resposta aprovada em $dateStr | Coleção: $collectionName]\n'
+        'Pergunta: $userContent\n'
+        'Resposta: $assistantContent';
+
+    // Insere chunk (trigger FTS5 indexa automaticamente)
+    await _db.insert('chunks', {
+      'document_id': docId,
+      'page': null,
+      'content': chunkContent,
+      'source_type': 'promoted_answer',
+      'original_message_id': messageId,
+      'created_at': now.toIso8601String(),
+    });
+
+    LoggerService.instance.info(_tag,
+        'Resposta promovida: msg=$messageId → chunk na coleção "$collectionName"');
+  }
+
+  /// Reverte promoção — remove chunk associado à mensagem.
+  Future<void> _revokePromotion(int messageId) async {
+    final deleted = await _db.delete(
+      'chunks',
+      where: 'original_message_id = ?',
+      whereArgs: [messageId],
+    );
+    if (deleted > 0) {
+      LoggerService.instance.info(_tag,
+          'Promoção revogada: msg=$messageId ($deleted chunks removidos)');
+    }
+  }
+
+  /// Obtém ou cria documento sintético "Respostas Aprovadas do Oráculo".
+  Future<int> _getOrCreatePromotedDocument(int collectionId) async {
+    const docName = 'Respostas Aprovadas do Oráculo';
+    final existing = await _db.query(
+      'documents',
+      where: 'filename = ? AND collection_id = ?',
+      whereArgs: [docName, collectionId],
+    );
+    if (existing.isNotEmpty) return existing.first['id'] as int;
+
+    final id = await _db.insert('documents', {
+      'filename': docName,
+      'collection_id': collectionId,
+      'imported_at': DateTime.now().toIso8601String(),
+    });
+    LoggerService.instance.info(_tag,
+        'Documento sintético criado: "$docName" na coleção $collectionId');
+    return id;
   }
 
   /// Retorna 'like', 'dislike', ou null.

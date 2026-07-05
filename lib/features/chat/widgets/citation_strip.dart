@@ -9,11 +9,15 @@ class CitationData {
     required this.filename,
     this.page,
     this.snippet,
+    this.sourceType,
+    this.promotedDate,
   });
 
   final String filename;
   final int? page;
   final String? snippet;
+  final String? sourceType; // 'document' | 'promoted_answer'
+  final String? promotedDate; // DD/MM/YYYY quando promoted_answer
 }
 
 /// Faixa de citação exibida abaixo de cada resposta do assistant.
@@ -56,14 +60,25 @@ class CitationStrip extends StatelessWidget {
   }
 
   Widget _buildChip(CitationData citation) {
-    final label = citation.page != null
-        ? '${citation.filename} (p.${citation.page})'
-        : citation.filename;
+    final String label;
+    if (citation.sourceType == 'promoted_answer') {
+      label = 'Resposta aprovada (${citation.promotedDate ?? "?"})';
+    } else {
+      label = citation.page != null
+          ? '${citation.filename} (p.${citation.page})'
+          : citation.filename;
+    }
 
     return Chip(
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      backgroundColor: AppColors.surface,
-      side: const BorderSide(color: AppColors.divider),
+      backgroundColor: citation.sourceType == 'promoted_answer'
+          ? AppColors.accentOrange.withValues(alpha: 0.1)
+          : AppColors.surface,
+      side: BorderSide(
+        color: citation.sourceType == 'promoted_answer'
+            ? AppColors.accentOrange.withValues(alpha: 0.4)
+            : AppColors.divider,
+      ),
       label: Text(label, style: AppTextStyles.techSmall),
       padding: const EdgeInsets.symmetric(horizontal: 4),
     );

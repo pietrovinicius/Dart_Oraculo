@@ -249,7 +249,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final placeholders = allChunkIds.map((_) => '?').join(',');
     final rows = await db.rawQuery(
-      'SELECT c.id, d.filename, c.page FROM chunks c '
+      'SELECT c.id, d.filename, c.page, c.source_type, c.created_at FROM chunks c '
       'JOIN documents d ON d.id = c.document_id '
       'WHERE c.id IN ($placeholders)',
       allChunkIds.toList(),
@@ -260,7 +260,24 @@ class _ChatScreenState extends State<ChatScreen> {
       final id = row['id'] as int;
       final filename = row['filename'] as String;
       final page = row['page'] as int?;
-      _citationCache[id] = CitationData(filename: filename, page: page);
+      final sourceType = row['source_type'] as String?;
+      final createdAt = row['created_at'] as String?;
+
+      String? promotedDate;
+      if (sourceType == 'promoted_answer' && createdAt != null) {
+        final dt = DateTime.tryParse(createdAt);
+        if (dt != null) {
+          promotedDate = '${dt.day.toString().padLeft(2, '0')}/'
+              '${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+        }
+      }
+
+      _citationCache[id] = CitationData(
+        filename: filename,
+        page: page,
+        sourceType: sourceType,
+        promotedDate: promotedDate,
+      );
     }
   }
 
