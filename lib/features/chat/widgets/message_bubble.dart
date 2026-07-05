@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -54,6 +55,9 @@ class MessageBubble extends StatelessWidget {
               MarkdownBody(
                 data: content,
                 selectable: true,
+                builders: {
+                  'code': _CodeBlockBuilder(),
+                },
                 styleSheet: MarkdownStyleSheet(
                   p: AppTextStyles.bodyLarge,
                   h1: AppTextStyles.displayMedium.copyWith(fontSize: 22),
@@ -198,6 +202,96 @@ class _FeedbackButton extends StatelessWidget {
           size: 16,
           color: isActive ? AppColors.accentOrange : AppColors.textMuted,
         ),
+      ),
+    );
+  }
+}
+
+/// Builder customizado para code blocks com botão de copiar.
+class _CodeBlockBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final code = element.textContent;
+    return _CodeBlockWidget(code: code);
+  }
+}
+
+class _CodeBlockWidget extends StatefulWidget {
+  const _CodeBlockWidget({required this.code});
+  final String code;
+
+  @override
+  State<_CodeBlockWidget> createState() => _CodeBlockWidgetState();
+}
+
+class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
+  bool _copied = false;
+
+  void _copyCode() {
+    Clipboard.setData(ClipboardData(text: widget.code));
+    setState(() => _copied = true);
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header com botão copy
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+            ),
+            child: Row(
+              children: [
+                const Spacer(),
+                InkWell(
+                  onTap: _copyCode,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _copied ? Icons.check : Icons.copy_outlined,
+                          size: 14,
+                          color: _copied ? AppColors.success : AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _copied ? 'Copiado' : 'Copiar',
+                          style: AppTextStyles.techSmall.copyWith(
+                            color: _copied ? AppColors.success : AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Código
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SelectableText(
+              widget.code,
+              style: AppTextStyles.techMedium,
+            ),
+          ),
+        ],
       ),
     );
   }

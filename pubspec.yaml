@@ -39,6 +39,7 @@ dependencies:
 
   # Markdown rendering
   flutter_markdown: ^0.7.0
+  markdown: ^7.0.0
 
   # Utilidades
   path_provider: ^2.1.0
