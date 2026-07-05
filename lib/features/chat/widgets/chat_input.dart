@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/services/clipboard_image_service.dart';
+import '../../../core/services/speech_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
@@ -17,6 +18,7 @@ class ChatInput extends StatefulWidget {
     this.isStreaming = false,
     this.onStop,
     this.clipboardImageService,
+    this.speechService,
   });
 
   final void Function(String message) onSend;
@@ -26,6 +28,7 @@ class ChatInput extends StatefulWidget {
   final bool isStreaming;
   final VoidCallback? onStop;
   final ClipboardImageService? clipboardImageService;
+  final SpeechService? speechService;
 
   @override
   State<ChatInput> createState() => _ChatInputState();
@@ -38,11 +41,54 @@ class _ChatInputState extends State<ChatInput> {
 
   Uint8List? _attachedImage;
   String _attachedMediaType = 'image/png';
+  bool _isListening = false;
+  SpeechService? _speechService;
 
   @override
   void initState() {
     super.initState();
     _focusNode.addListener(() => _focusNotifier.value = _focusNode.hasFocus);
+    _speechService = widget.speechService ?? SpeechService(speechToText: null);
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speechService!.stopListening();
+      setState(() => _isListening = false);
+      return;
+    }
+
+    final available = await _speechService!.initialize();
+    if (!available) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Microfone ou reconhecimento de fala indisponível. '
+              'Verifique as permissões em Preferências do Sistema.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isListening = true);
+    await _speechService!.startListening(
+      onResult: (text, isFinal) {
+        if (mounted) {
+          setState(() => _controller.text = text);
+          // Move cursor para o final
+          _controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: _controller.text.length),
+          );
+        }
+        if (isFinal) {
+          setState(() => _isListening = false);
+        }
+      },
+    );
   }
 
   void _handleSend() {
@@ -191,6 +237,18 @@ class _ChatInputState extends State<ChatInput> {
                     color: AppColors.textSecondary,
                     tooltip: 'Anexar imagem',
                     onPressed: widget.enabled ? _pickImage : null,
+                    iconSize: 20,
+                  ),
+                  // Botão microfone (ditado)
+                  IconButton(
+                    icon: Icon(
+                      _isListening ? Icons.mic : Icons.mic_none,
+                    ),
+                    color: _isListening
+                        ? AppColors.accentOrange
+                        : AppColors.textSecondary,
+                    tooltip: _isListening ? 'Parar ditado' : 'Ditado por voz',
+                    onPressed: widget.enabled ? _toggleListening : null,
                     iconSize: 20,
                   ),
                   Expanded(

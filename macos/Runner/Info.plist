@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Dart Oráculo usa reconhecimento de fala para transcrever suas perguntas por voz.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Dart Oráculo precisa acessar o microfone para o ditado por voz.</string>
 </dict>
 </plist>
