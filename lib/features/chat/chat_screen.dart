@@ -1177,18 +1177,49 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _onFeedbackChanged(int messageId, String? value) async {
-    await _chatController?.setFeedback(messageId, value);
+    final result = await _chatController?.setFeedback(messageId, value);
+
+    // Se checagem de fidelidade pede confirmação
+    if (result != null && result.needsConfirmation && mounted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          title: const Text('Verificação de fundamentação',
+              style: AppTextStyles.bodyLarge),
+          content: const Text(
+            'Esta resposta contém afirmações que não foram encontradas '
+            'nos documentos consultados. Deseja promovê-la mesmo assim?',
+            style: AppTextStyles.bodyMedium,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accentOrange,
+              ),
+              child: const Text('Promover assim mesmo'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed == true) {
+        await _chatController?.forcePromote(messageId);
+      } else {
+        // Cancela o like
+        await _chatController?.setFeedback(messageId, null);
+      }
+    }
+
     if (mounted) {
-      setState(() {
-        _feedbacks[messageId] = value;
-        // Se foi toggle-off (mesmo valor), remove do mapa
-        if (value != null && _feedbacks[messageId] == value) {
-          // Recarregar para garantir estado correto
-        }
-      });
       // Recarregar estado real do feedback
       final actual = await _chatController?.getFeedback(messageId);
-      if (mounted) setState(() => _feedbacks[messageId] = actual);
+      setState(() => _feedbacks[messageId] = actual);
     }
   }
 }

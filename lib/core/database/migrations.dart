@@ -204,4 +204,21 @@ class Migrations {
     addSourceTypeToChunks,
     addOriginalMessageIdToChunks,
   ];
+
+  // --- V7: verify_before_promote em collections ---
+
+  static const String addVerifyBeforePromoteToCollections = '''
+    ALTER TABLE collections ADD COLUMN verify_before_promote INTEGER NOT NULL DEFAULT 1;
+  ''';
+
+  /// Migrations incrementais v6 → v7.
+  static List<String> get upgradeV6toV7 => [
+    addVerifyBeforePromoteToCollections,
+  ];
+
+  /// Fresh install completo (v7).
+  static List<String> get allV7 => [
+    ...allV6,
+    addVerifyBeforePromoteToCollections,
+  ];
 }

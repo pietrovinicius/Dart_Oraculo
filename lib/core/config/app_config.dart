@@ -30,5 +30,5 @@ class AppConfig {
 
   // Database
   static const String databaseName = 'dart_oraculo.db';
-  static const int databaseVersion = 6;
+  static const int databaseVersion = 7;
 }

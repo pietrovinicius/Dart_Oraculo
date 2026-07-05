@@ -39,7 +39,7 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    for (final sql in Migrations.allV6) {
+    for (final sql in Migrations.allV7) {
       await db.execute(sql);
     }
     // Fresh install: cria coleção "Geral" padrão
@@ -88,6 +88,11 @@ class DatabaseHelper {
     }
     if (oldVersion < 6) {
       for (final sql in Migrations.upgradeV5toV6) {
+        await db.execute(sql);
+      }
+    }
+    if (oldVersion < 7) {
+      for (final sql in Migrations.upgradeV6toV7) {
         await db.execute(sql);
       }
     }

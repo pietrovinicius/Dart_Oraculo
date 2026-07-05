@@ -6,11 +6,23 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/image_attachment.dart';
 import '../../core/services/anthropic_service.dart';
+import '../../core/services/fidelity_checker.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
 import '../../core/services/logger_service.dart';
 import 'models/conversation.dart';
 import 'models/message.dart';
+
+/// Resultado do feedback + checagem de fidelidade.
+class FeedbackResult {
+  const FeedbackResult({
+    this.needsConfirmation = false,
+    this.ungroundedClaims,
+  });
+
+  final bool needsConfirmation;
+  final List<String>? ungroundedClaims;
+}
 
 /// Controller principal do chat.
 /// Orquestra: pergunta → recuperação FTS5 → montagem de prompt → geração → persistência.
@@ -240,9 +252,9 @@ class ChatController extends ChangeNotifier {
   // --- Feedback (like/dislike) + Promoção RAG ---
 
   /// Grava, alterna ou remove voto de feedback.
-  /// Like → promove resposta como chunk pesquisável.
+  /// Like → checagem de fidelidade (se Anthropic) → promove resposta.
   /// Remove like / dislike → reverte promoção.
-  Future<void> setFeedback(int messageId, String? value) async {
+  Future<FeedbackResult> setFeedback(int messageId, String? value) async {
     LoggerService.instance.info(_tag, 'setFeedback(msg=$messageId, value=$value)');
 
     final existing = await _db.query(
@@ -254,60 +266,146 @@ class ChatController extends ChangeNotifier {
     final String? previousValue =
         existing.isNotEmpty ? existing.first['value'] as String : null;
 
+    // Determina se precisa promover nesta chamada
+    bool shouldPromote = false;
+    bool shouldRevoke = false;
+
     if (value == null) {
-      // Remove feedback
-      await _db.delete(
-        'message_feedback',
-        where: 'message_id = ?',
-        whereArgs: [messageId],
-      );
-      // Reverte promoção se tinha like
-      if (previousValue == 'like') {
-        await _revokePromotion(messageId);
-      }
+      await _db.delete('message_feedback', where: 'message_id = ?', whereArgs: [messageId]);
+      if (previousValue == 'like') shouldRevoke = true;
     } else if (existing.isEmpty) {
-      // Insere novo
       await _db.insert('message_feedback', {
         'message_id': messageId,
         'value': value,
         'created_at': DateTime.now().toIso8601String(),
       });
-      // Promove se é like
-      if (value == 'like') {
-        await _promoteAnswer(messageId);
-      }
+      if (value == 'like') shouldPromote = true;
     } else {
       final currentValue = existing.first['value'] as String;
       if (currentValue == value) {
-        // Toggle off — mesmo valor = remove
-        await _db.delete(
-          'message_feedback',
-          where: 'message_id = ?',
-          whereArgs: [messageId],
-        );
-        // Reverte promoção se era like
-        if (currentValue == 'like') {
-          await _revokePromotion(messageId);
-        }
+        // Toggle off
+        await _db.delete('message_feedback', where: 'message_id = ?', whereArgs: [messageId]);
+        if (currentValue == 'like') shouldRevoke = true;
       } else {
-        // Alterna para outro valor
         await _db.update(
           'message_feedback',
           {'value': value, 'created_at': DateTime.now().toIso8601String()},
-          where: 'message_id = ?',
-          whereArgs: [messageId],
+          where: 'message_id = ?', whereArgs: [messageId],
         );
-        // Se era like e virou dislike → reverte
-        if (currentValue == 'like' && value == 'dislike') {
-          await _revokePromotion(messageId);
-        }
-        // Se era dislike e virou like → promove
-        if (currentValue == 'dislike' && value == 'like') {
+        if (currentValue == 'like' && value == 'dislike') shouldRevoke = true;
+        if (currentValue == 'dislike' && value == 'like') shouldPromote = true;
+      }
+    }
+
+    // Reverte promoção se necessário
+    if (shouldRevoke) {
+      await _revokePromotion(messageId);
+    }
+
+    // Checagem de fidelidade + promoção
+    if (shouldPromote) {
+      final checkResult = await _checkAndPromote(messageId);
+      if (checkResult.needsConfirmation) {
+        notifyListeners();
+        return checkResult;
+      }
+    }
+
+    notifyListeners();
+    return const FeedbackResult();
+  }
+
+  /// Força promoção sem checagem (após user confirmar dialog).
+  Future<void> forcePromote(int messageId) async {
+    await _promoteAnswer(messageId);
+    notifyListeners();
+  }
+
+  /// Checa fidelidade e promove se grounded. Retorna resultado.
+  Future<FeedbackResult> _checkAndPromote(int messageId) async {
+    // Busca modelo usado na resposta
+    final msgRows = await _db.query('messages', where: 'id = ?', whereArgs: [messageId]);
+    if (msgRows.isEmpty) return const FeedbackResult();
+    final modelUsed = msgRows.first['model_used'] as String? ?? '';
+
+    // Se Qwen → skip checagem, promove direto
+    if (modelUsed.contains('qwen') || modelUsed.contains('Qwen')) {
+      LoggerService.instance.info(_tag, 'Skip checagem fidelidade (Qwen)');
+      await _promoteAnswer(messageId);
+      return const FeedbackResult();
+    }
+
+    // Busca collection_id para verificar toggle
+    final convId = msgRows.first['conversation_id'] as int;
+    final convRows = await _db.query('conversations', where: 'id = ?', whereArgs: [convId]);
+    if (convRows.isEmpty) {
+      await _promoteAnswer(messageId);
+      return const FeedbackResult();
+    }
+    final collectionId = convRows.first['collection_id'] as int?;
+
+    // Verifica toggle por coleção
+    if (collectionId != null) {
+      final colRows = await _db.query('collections', where: 'id = ?', whereArgs: [collectionId]);
+      if (colRows.isNotEmpty) {
+        final verify = (colRows.first['verify_before_promote'] as int?) ?? 1;
+        if (verify == 0) {
+          LoggerService.instance.info(_tag, 'Skip checagem (toggle desligado na coleção)');
           await _promoteAnswer(messageId);
+          return const FeedbackResult();
         }
       }
     }
-    notifyListeners();
+
+    // Determina verificador cruzado
+    final String verifierModel;
+    if (modelUsed.contains('opus') || modelUsed.contains('Opus')) {
+      verifierModel = AppConfig.modelSonnet;
+    } else {
+      verifierModel = AppConfig.modelOpus;
+    }
+
+    // Monta contexto dos chunks usados
+    final chunksUsed = msgRows.first['chunks_used'] as String?;
+    if (chunksUsed == null || chunksUsed.isEmpty) {
+      // Sem chunks → não tem o que verificar, promove direto
+      await _promoteAnswer(messageId);
+      return const FeedbackResult();
+    }
+
+    final chunkIds = (jsonDecode(chunksUsed) as List).cast<int>();
+    if (chunkIds.isEmpty) {
+      await _promoteAnswer(messageId);
+      return const FeedbackResult();
+    }
+
+    final placeholders = chunkIds.map((_) => '?').join(',');
+    final chunkRows = await _db.rawQuery(
+      'SELECT content FROM chunks WHERE id IN ($placeholders)', chunkIds);
+    final chunksContext = chunkRows.map((r) => r['content'] as String).join('\n\n');
+
+    // Chama verificador
+    final checker = FidelityChecker(
+      apiKey: _anthropicService.apiKey,
+      httpClient: null,
+    );
+    final result = await checker.check(
+      answerText: msgRows.first['content'] as String,
+      chunksContext: chunksContext,
+      verifierModel: verifierModel,
+    );
+
+    if (result.isGrounded) {
+      await _promoteAnswer(messageId);
+      return const FeedbackResult();
+    } else {
+      LoggerService.instance.warn(_tag,
+          'Resposta não fundamentada: ${result.ungroundedClaims}');
+      return FeedbackResult(
+        needsConfirmation: true,
+        ungroundedClaims: result.ungroundedClaims,
+      );
+    }
   }
 
   /// Promove resposta do assistant como chunk pesquisável na coleção.

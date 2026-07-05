@@ -33,6 +33,9 @@ class AnthropicService implements GenerationService {
   final String _apiKey;
   final http.Client _httpClient;
 
+  /// Acesso à API key para uso por FidelityChecker.
+  String get apiKey => _apiKey;
+
   /// Constrói headers para a API.
   Map<String, String> buildHeaders() => {
     'x-api-key': _apiKey,
