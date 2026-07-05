@@ -210,11 +210,18 @@ void main() {
       expect(results.first.content, contains('ADEP_V'));
     });
 
-    test('AND implícito — ambos termos devem estar presentes', () async {
-      // "Flutter data" → AND: precisa conter ambos
-      // Nenhum chunk tem "Flutter" E "data" juntos
+    test('AND implícito com fallback OR — retorna resultados quando AND falha', () async {
+      // "Flutter data" → AND retorna vazio (nenhum chunk tem ambos)
+      // Fallback OR retorna chunks com "Flutter" OU "data"
       final results = await ftsService.search('Flutter data');
-      expect(results, isEmpty);
+      expect(results, isNotEmpty);
+      // Deve conter pelo menos um chunk com Flutter ou data
+      expect(
+        results.any((r) =>
+            r.content.toLowerCase().contains('flutter') ||
+            r.content.toLowerCase().contains('data')),
+        isTrue,
+      );
     });
   });
 }

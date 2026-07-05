@@ -50,14 +50,43 @@ class FtsService {
       return [];
     }
 
+    var rows = await _executeSearch(sanitized, collectionId, effectiveLimit);
+
+    // Fallback: se AND retorna vazio e há múltiplos termos, tenta OR
+    if (rows.isEmpty && sanitized.contains(' ')) {
+      final orQuery = sanitized
+          .split(' ')
+          .where((t) => t.isNotEmpty)
+          .join(' OR ');
+      LoggerService.instance.info(_tag,
+          'AND retornou 0 → fallback OR: "$orQuery"');
+      rows = await _executeSearch(orQuery, collectionId, effectiveLimit);
+    }
+
+    return rows.map((row) => FtsResult(
+      chunkId: row['chunk_id'] as int,
+      documentId: row['document_id'] as int,
+      filename: row['filename'] as String,
+      page: row['page'] as int?,
+      content: row['content'] as String,
+      rank: (row['rank'] as num).toDouble(),
+    )).toList();
+  }
+
+  /// Executa query FTS5 raw com filtro de coleção.
+  Future<List<Map<String, Object?>>> _executeSearch(
+    String matchQuery,
+    int? collectionId,
+    int limit,
+  ) async {
     final whereClause = collectionId != null
         ? 'WHERE chunks_fts MATCH ? AND d.collection_id = ?'
         : 'WHERE chunks_fts MATCH ?';
     final args = collectionId != null
-        ? [sanitized, collectionId, effectiveLimit]
-        : [sanitized, effectiveLimit];
+        ? [matchQuery, collectionId, limit]
+        : [matchQuery, limit];
 
-    final rows = await _db.rawQuery('''
+    return _db.rawQuery('''
       SELECT
         c.id AS chunk_id,
         c.document_id,
@@ -72,15 +101,6 @@ class FtsService {
       ORDER BY rank
       LIMIT ?
     ''', args);
-
-    return rows.map((row) => FtsResult(
-      chunkId: row['chunk_id'] as int,
-      documentId: row['document_id'] as int,
-      filename: row['filename'] as String,
-      page: row['page'] as int?,
-      content: row['content'] as String,
-      rank: (row['rank'] as num).toDouble(),
-    )).toList();
   }
 
   // Stopwords pt-BR + en comuns — removidas da query FTS5
