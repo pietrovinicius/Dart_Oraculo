@@ -102,6 +102,25 @@ class ChatController extends ChangeNotifier {
   }) async* {
     LoggerService.instance.info(_tag, 'askQuestion(conv=$conversationId, model=$model, collection=$collectionId, q="${question.length > 50 ? question.substring(0, 50) : question}...")');
 
+    // 0. Info da base de conhecimento
+    final docCountRows = collectionId != null
+        ? await _db.rawQuery(
+            'SELECT COUNT(*) as cnt FROM documents WHERE collection_id = ?',
+            [collectionId])
+        : await _db.rawQuery('SELECT COUNT(*) as cnt FROM documents');
+    final chunkCountRows = collectionId != null
+        ? await _db.rawQuery(
+            'SELECT COUNT(*) as cnt FROM chunks c '
+            'JOIN documents d ON d.id = c.document_id '
+            'WHERE d.collection_id = ?',
+            [collectionId])
+        : await _db.rawQuery('SELECT COUNT(*) as cnt FROM chunks');
+    final docCount = docCountRows.first['cnt'] as int;
+    final chunkCount = chunkCountRows.first['cnt'] as int;
+    LoggerService.instance.info(_tag,
+        'Base: $docCount documentos, $chunkCount chunks '
+        '(coleção=${collectionId ?? "todas"})');
+
     // 1. Busca chunks relevantes via FTS5 (filtrado por coleção)
     final ftsResults = await _ftsService.search(question, collectionId: collectionId);
     LoggerService.instance.info(_tag, 'FTS5 retornou ${ftsResults.length} chunks');
