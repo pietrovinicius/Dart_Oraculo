@@ -16,6 +16,7 @@ class MessageBubble extends StatelessWidget {
     this.feedback,
     this.onFeedbackChanged,
     this.timestamp,
+    this.onEdit,
   });
 
   final String content;
@@ -24,6 +25,7 @@ class MessageBubble extends StatelessWidget {
   final String? feedback;
   final void Function(String? value)? onFeedbackChanged;
   final DateTime? timestamp;
+  final void Function(String newText)? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -88,14 +90,24 @@ class MessageBubble extends StatelessWidget {
                 ),
               ),
 
-            // Footer: modelo + timestamp + feedback + copy
-            if (modelUsed != null || (!isUser && onFeedbackChanged != null) || timestamp != null) ...[
+            // Footer: modelo + timestamp + feedback + copy + edit
+            if (modelUsed != null || timestamp != null || (isUser && onEdit != null) || (!isUser && onFeedbackChanged != null)) ...[
               const SizedBox(height: 8),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (modelUsed != null)
+                  if (modelUsed != null) ...[                    Icon(
+                      modelUsed!.contains('qwen')
+                          ? Icons.computer_outlined
+                          : Icons.cloud_outlined,
+                      size: 12,
+                      color: modelUsed!.contains('qwen')
+                          ? AppColors.success
+                          : AppColors.accentOrange,
+                    ),
+                    const SizedBox(width: 4),
                     Text(modelUsed!, style: AppTextStyles.techSmall),
+                  ],
                   if (timestamp != null) ...[
                     if (modelUsed != null) const SizedBox(width: 8),
                     Text(
@@ -104,6 +116,13 @@ class MessageBubble extends StatelessWidget {
                     ),
                   ],
                   const Spacer(),
+                  // Editar (só user)
+                  if (isUser && onEdit != null)
+                    _ActionButton(
+                      icon: Icons.edit_outlined,
+                      tooltip: 'Editar',
+                      onTap: () => onEdit!(content),
+                    ),
                   // Copiar
                   if (!isUser)
                     _ActionButton(
@@ -177,7 +196,7 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _FeedbackButton extends StatelessWidget {
+class _FeedbackButton extends StatefulWidget {
   const _FeedbackButton({
     required this.icon,
     required this.activeIcon,
@@ -191,16 +210,36 @@ class _FeedbackButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_FeedbackButton> createState() => _FeedbackButtonState();
+}
+
+class _FeedbackButtonState extends State<_FeedbackButton> {
+  double _scale = 1.0;
+
+  void _handleTap() {
+    setState(() => _scale = 1.3);
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => _scale = 1.0);
+    });
+    widget.onTap();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
+      onTap: _handleTap,
       child: Padding(
         padding: const EdgeInsets.all(4),
-        child: Icon(
-          isActive ? activeIcon : icon,
-          size: 16,
-          color: isActive ? AppColors.accentOrange : AppColors.textMuted,
+        child: AnimatedScale(
+          scale: _scale,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+          child: Icon(
+            widget.isActive ? widget.activeIcon : widget.icon,
+            size: 16,
+            color: widget.isActive ? AppColors.accentOrange : AppColors.textMuted,
+          ),
         ),
       ),
     );

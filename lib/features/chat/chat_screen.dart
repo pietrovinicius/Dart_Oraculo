@@ -29,6 +29,7 @@ import 'models/message.dart';
 import 'widgets/chat_input.dart';
 import 'widgets/citation_strip.dart';
 import 'widgets/message_bubble.dart';
+import 'widgets/retry_bubble.dart';
 import 'widgets/sidebar.dart';
 
 /// Tela principal — sidebar + painel de chat.
@@ -59,6 +60,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String _appVersion = '';
   final _scrollController = ScrollController();
   bool _stopRequested = false;
+  String? _lastFailedQuestion;
+  bool _showScrollToBottom = false;
 
   @override
   void initState() {
@@ -384,6 +387,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // 1. Mostra mensagem do usuário imediatamente
     setState(() {
+      _lastFailedQuestion = null;
       _messages = [
         ..._messages,
         Message(
@@ -422,25 +426,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 3. Carrega mensagens reais do banco (substitui as temporárias)
       await _loadMessages(_activeConversationId!);
-    } on AnthropicException catch (e) {
+    } on AnthropicException catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro da API: ${e.message}'),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        setState(() => _lastFailedQuestion = text);
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro inesperado: $e'),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        setState(() => _lastFailedQuestion = text);
       }
     } finally {
       _thinkingStopwatch.stop();
@@ -653,7 +645,31 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: _activeConversationId == null
                       ? _buildEmptyState()
-                      : _buildMessageList(),
+                      : AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          switchInCurve: Curves.easeOut,
+                          child: Stack(
+                            key: ValueKey<int?>(_activeConversationId),
+                            children: [
+                              NotificationListener<ScrollNotification>(
+                                onNotification: _handleScrollNotification,
+                                child: _buildMessageList(),
+                              ),
+                              if (_showScrollToBottom)
+                                Positioned(
+                                  right: 16,
+                                  bottom: 16,
+                                  child: FloatingActionButton.small(
+                                    onPressed: _scrollToBottom,
+                                    backgroundColor: AppColors.surface,
+                                    foregroundColor: AppColors.accentOrange,
+                                    elevation: 4,
+                                    child: const Icon(Icons.keyboard_arrow_down),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                 ),
 
                 // Input
@@ -764,6 +780,43 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildConversationEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline,
+            size: 56,
+            color: AppColors.accentOrange.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Nova conversa',
+            style: AppTextStyles.bodyLarge,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Pergunte algo sobre seus documentos',
+            style: AppTextStyles.bodyMedium,
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildPromptChip('Resuma meus documentos'),
+              _buildPromptChip('O que diz sobre...?'),
+              _buildPromptChip('Compare os conceitos de...'),
+              _buildPromptChip('Quais os pontos principais?'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPromptChip(String text) {
     return ActionChip(
       label: Text(text, style: AppTextStyles.bodySmall),
@@ -788,6 +841,17 @@ class _ChatScreenState extends State<ChatScreen> {
       // Anthropic com o modelo selecionado
       _chatController!.activeGenerationService = _chatController!.anthropicService;
     }
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final atBottom = _scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 100;
+      if (_showScrollToBottom == atBottom) {
+        setState(() => _showScrollToBottom = !atBottom);
+      }
+    }
+    return false;
   }
 
   void _scrollToBottom() {
@@ -822,8 +886,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageList() {
-    // Conta itens: mensagens + streaming bubble (se ativo)
-    final itemCount = _messages.length + (_isStreaming ? 1 : 0);
+    // Empty state para conversa recém-criada
+    if (_messages.isEmpty && !_isStreaming && _lastFailedQuestion == null) {
+      return _buildConversationEmptyState();
+    }
+
+    // Conta itens: mensagens + streaming bubble (se ativo) + retry bubble (se erro)
+    final hasRetry = _lastFailedQuestion != null && !_isStreaming;
+    final itemCount =
+        _messages.length + (_isStreaming ? 1 : 0) + (hasRetry ? 1 : 0);
 
     return ListView.builder(
       controller: _scrollController,
@@ -835,12 +906,27 @@ class _ChatScreenState extends State<ChatScreen> {
           return _buildStreamingBubble();
         }
 
+        // Retry bubble após todas as mensagens
+        if (hasRetry && index == _messages.length) {
+          return RetryBubble(
+            onRetry: () => _sendMessage(_lastFailedQuestion!),
+          );
+        }
+
         final message = _messages[index];
         final isUser = message.role == 'user';
+
+        // Separador de data entre mensagens de dias diferentes
+        Widget? dateSeparator;
+        if (index == 0 ||
+            !_isSameDay(message.createdAt, _messages[index - 1].createdAt)) {
+          dateSeparator = _buildDateSeparator(message.createdAt);
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (dateSeparator != null) dateSeparator,
             MessageBubble(
               content: message.content,
               isUser: isUser,
@@ -872,6 +958,40 @@ class _ChatScreenState extends State<ChatScreen> {
     final seconds = d.inSeconds;
     if (seconds < 60) return '${seconds}s';
     return '${seconds ~/ 60}m ${seconds % 60}s';
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  String _formatDateLabel(DateTime date) {
+    final now = DateTime.now();
+    if (_isSameDay(date, now)) return 'Hoje';
+    final yesterday = now.subtract(const Duration(days: 1));
+    if (_isSameDay(date, yesterday)) return 'Ontem';
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
+  }
+
+  Widget _buildDateSeparator(DateTime date) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 48),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(color: AppColors.divider)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              _formatDateLabel(date),
+              style: AppTextStyles.techSmall.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const Expanded(child: Divider(color: AppColors.divider)),
+        ],
+      ),
+    );
   }
 
   Widget _buildStreamingBubble() {

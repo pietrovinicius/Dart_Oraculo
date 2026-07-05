@@ -270,4 +270,14 @@ class ChatController extends ChangeNotifier {
     }
     return result;
   }
+
+  /// Deleta todas as mensagens com id > [afterMessageId] na conversa.
+  /// Usado para editar mensagem do user e reenviar.
+  Future<void> deleteMessagesAfter(int conversationId, int afterMessageId) async {
+    await _db.delete(
+      'messages',
+      where: 'conversation_id = ? AND id > ?',
+      whereArgs: [conversationId, afterMessageId],
+    );
+  }
 }

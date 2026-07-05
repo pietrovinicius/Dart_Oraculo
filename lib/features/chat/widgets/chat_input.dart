@@ -27,6 +27,13 @@ class ChatInput extends StatefulWidget {
 class _ChatInputState extends State<ChatInput> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
+  final _focusNotifier = ValueNotifier<bool>(false);
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() => _focusNotifier.value = _focusNode.hasFocus);
+  }
 
   void _handleSend() {
     final text = _controller.text.trim();
@@ -40,18 +47,27 @@ class _ChatInputState extends State<ChatInput> {
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();
+    _focusNotifier.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.divider)),
-      ),
-      child: Row(
+    return ValueListenableBuilder<bool>(
+      valueListenable: _focusNotifier,
+      builder: (context, isFocused, _) {
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border(
+              top: BorderSide(
+                color: isFocused ? AppColors.accentOrange : AppColors.divider,
+                width: isFocused ? 1.5 : 1,
+              ),
+            ),
+          ),
+          child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
@@ -94,6 +110,8 @@ class _ChatInputState extends State<ChatInput> {
             ),
         ],
       ),
+    );
+      },
     );
   }
 }
