@@ -1,6 +1,7 @@
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import '../config/app_config.dart';
+import 'logger_service.dart';
 
 /// Resultado de busca FTS5 com metadados do chunk e documento.
 class FtsResult {
@@ -25,6 +26,7 @@ class FtsResult {
 class FtsService {
   FtsService({required Database database}) : _db = database;
 
+  static const _tag = 'FTS5';
   final Database _db;
 
   /// Busca chunks relevantes para a [query].
@@ -41,7 +43,12 @@ class FtsService {
     final effectiveLimit = limit ?? AppConfig.maxChunksPerQuery;
 
     final sanitized = _sanitizeQuery(trimmed);
-    if (sanitized.isEmpty) return [];
+    LoggerService.instance.info(_tag,
+        'search() query="$trimmed" → sanitized="$sanitized" collection=$collectionId');
+    if (sanitized.isEmpty) {
+      LoggerService.instance.warn(_tag, 'query sanitizada vazia — retornando []');
+      return [];
+    }
 
     final whereClause = collectionId != null
         ? 'WHERE chunks_fts MATCH ? AND d.collection_id = ?'
@@ -76,19 +83,41 @@ class FtsService {
     )).toList();
   }
 
-  /// Sanitiza query removendo operadores FTS5 que poderiam causar erro.
-  /// Mantém apenas palavras alfanuméricas separadas por OR implícito.
+  // Stopwords pt-BR + en comuns — removidas da query FTS5
+  static const _stopwords = <String>{
+    // Português
+    'a', 'o', 'e', 'é', 'de', 'do', 'da', 'dos', 'das',
+    'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'uns', 'umas',
+    'por', 'para', 'com', 'sem', 'que', 'se', 'ou', 'mas',
+    'como', 'esse', 'essa', 'este', 'esta', 'isso', 'isto',
+    'ele', 'ela', 'eles', 'elas', 'eu', 'tu', 'nós', 'vos',
+    'me', 'te', 'lhe', 'ao', 'aos', 'as', 'os',
+    'voce', 'você', 'meu', 'sua', 'seu', 'não', 'nao',
+    'ser', 'ter', 'há', 'ha', 'foi', 'são', 'sao',
+    // Inglês
+    'the', 'an', 'is', 'are', 'was', 'were', 'be',
+    'of', 'and', 'or', 'in', 'on', 'at', 'to', 'for',
+    'it', 'this', 'that', 'with', 'from', 'by',
+  };
+
+  bool _isStopword(String word) => _stopwords.contains(word.toLowerCase());
+
+  /// Sanitiza query para FTS5:
+  /// 1. Preserva underscores (ADEP_V → busca exata como frase)
+  /// 2. Remove stopwords pt/en
+  /// 3. Usa AND implícito (FTS5 default: espaço entre termos = AND)
+  /// 4. Termos com underscore viram phrase match ("ADEP_V")
   String _sanitizeQuery(String query) {
-    // Remove caracteres especiais do FTS5
-    final cleaned = query.replaceAll(RegExp(r'[^\w\s\p{L}]', unicode: true), ' ');
+    // Remove caracteres especiais exceto underscore e letras acentuadas
+    final cleaned = query.replaceAll(RegExp(r'[^\w\s\p{L}_]', unicode: true), ' ');
     final words = cleaned.split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
+        .where((w) => w.isNotEmpty && !_isStopword(w))
         .toList();
 
     if (words.isEmpty) return '';
 
-    // FTS5: termos separados por espaço = AND implícito
-    // Usar OR para matches parciais mais flexíveis
-    return words.join(' OR ');
+    // Termos com underscore → phrase match (FTS5 tokeniza underscore como separador)
+    // Outros termos → AND implícito (sem operador = AND no FTS5)
+    return words.map((w) => w.contains('_') ? '"$w"' : w).join(' ');
   }
 }

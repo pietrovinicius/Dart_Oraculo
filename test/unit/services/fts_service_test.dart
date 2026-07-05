@@ -184,5 +184,37 @@ void main() {
       final allResults = await ftsService.search('linguagem');
       expect(allResults.length, greaterThanOrEqualTo(2));
     });
+
+    test('stopwords são removidas — "o que é Flutter" busca só Flutter', () async {
+      final results = await ftsService.search('o que é o Flutter');
+      expect(results, isNotEmpty);
+      expect(results.first.content.toLowerCase(), contains('flutter'));
+    });
+
+    test('query só com stopwords retorna vazio', () async {
+      final results = await ftsService.search('o que é da');
+      expect(results, isEmpty);
+    });
+
+    test('underscore preservado como termo — busca ADEP_V', () async {
+      // Seed chunk com ADEP_V
+      await db.insert('chunks', {
+        'document_id': 1,
+        'page': 5,
+        'content': 'A view ADEP_V contém dados de adequação de procedimentos.',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      final results = await ftsService.search('ADEP_V');
+      expect(results, isNotEmpty);
+      expect(results.first.content, contains('ADEP_V'));
+    });
+
+    test('AND implícito — ambos termos devem estar presentes', () async {
+      // "Flutter data" → AND: precisa conter ambos
+      // Nenhum chunk tem "Flutter" E "data" juntos
+      final results = await ftsService.search('Flutter data');
+      expect(results, isEmpty);
+    });
   });
 }

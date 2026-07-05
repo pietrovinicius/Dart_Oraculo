@@ -106,6 +106,19 @@ class ChatController extends ChangeNotifier {
     final ftsResults = await _ftsService.search(question, collectionId: collectionId);
     LoggerService.instance.info(_tag, 'FTS5 retornou ${ftsResults.length} chunks');
 
+    // Log detalhado de cada chunk retornado
+    var truncatedCount = 0;
+    for (var i = 0; i < ftsResults.length; i++) {
+      final r = ftsResults[i];
+      final preview = r.content.length > 80
+          ? '${r.content.substring(0, 80).replaceAll('\n', ' ')}...'
+          : r.content.replaceAll('\n', ' ');
+      LoggerService.instance.info(_tag,
+          '  chunk #${i + 1} [rank=${r.rank.toStringAsFixed(2)}] '
+          'id=${r.chunkId} doc="${r.filename}" p.${r.page ?? "?"} '
+          'preview="$preview"');
+    }
+
     // 2. Monta contexto a partir dos chunks recuperados
     //    Trunca chunks grandes conforme limite do motor ativo.
     final maxChars = activeGenerationService.maxContextCharsPerChunk;
@@ -119,6 +132,7 @@ class ChatController extends ChangeNotifier {
       final content = result.content;
       final String truncatedContent;
       if (content.length > maxChars) {
+        truncatedCount++;
         // Trunca com nota explicativa — chunk indexado permanece íntegro
         final lineCount = '\n'.allMatches(content).length + 1;
         truncatedContent = '${content.substring(0, maxChars)}\n'
@@ -128,17 +142,23 @@ class ChatController extends ChangeNotifier {
         truncatedContent = content;
       }
       contextBuffer.writeln(
-        '[${result.filename}, p.${result.page ?? "?"}]: $truncatedContent',
+        '[Fonte: ${result.filename} | p.${result.page ?? "?"} | relevância: ${result.rank.toStringAsFixed(2)}]',
       );
+      contextBuffer.writeln(truncatedContent);
       contextBuffer.writeln();
     }
     final context = contextBuffer.toString();
+    LoggerService.instance.info(_tag,
+        'Contexto montado: ${(context.length / 1024).toStringAsFixed(1)}KB '
+        '(${ftsResults.length} chunks, truncados: $truncatedCount)');
 
     // 3. Recupera histórico recente da conversa
     final allMessages = await getMessages(conversationId);
     final recentMessages = allMessages.length > AppConfig.maxHistoryMessages
         ? allMessages.sublist(allMessages.length - AppConfig.maxHistoryMessages)
         : allMessages;
+    LoggerService.instance.info(_tag,
+        'Histórico: ${recentMessages.length} mensagens (de ${allMessages.length} total)');
 
     final history = recentMessages.map((m) => {
       'role': m.role,

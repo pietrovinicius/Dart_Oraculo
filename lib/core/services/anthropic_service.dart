@@ -48,10 +48,17 @@ class AnthropicService implements GenerationService {
     required String model,
     List<ImageAttachment>? images,
   }) {
-    final systemPrompt = 'Você é o Dart Oráculo, um assistente de conhecimento pessoal. '
-        'Responda com base exclusivamente no contexto fornecido abaixo. '
-        'Se a informação não estiver no contexto, diga que não encontrou nos documentos.\n\n'
-        '--- CONTEXTO ---\n$context\n--- FIM DO CONTEXTO ---';
+    final systemPrompt = 'Você é o Dart Oráculo, assistente de conhecimento pessoal.\n\n'
+        'INSTRUÇÕES:\n'
+        '1. Responda SOMENTE com base no CONTEXTO abaixo.\n'
+        '2. Se a informação não está no contexto, diga claramente: '
+        '"Não encontrei essa informação nos documentos indexados."\n'
+        '3. Cite o documento fonte e página quando possível.\n'
+        '4. Se o contexto contém informação parcial, mencione o que encontrou e o que falta.\n'
+        '5. NÃO invente informação que não está no contexto.\n\n'
+        '--- CONTEXTO (recuperado via busca nos documentos) ---\n'
+        '$context\n'
+        '--- FIM DO CONTEXTO ---';
 
     // Monta content da mensagem do user (com ou sem imagem)
     final dynamic userContent;
