@@ -17,6 +17,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **chat_screen.dart**: Drop de .md agora aceito no DropTarget (antes só imagens).
 - **context_attachment_test.dart**: 3 testes unitários (injeção, truncagem, ausência após remoção).
 - **migration_v8_test.dart**: 2 testes (fresh install, upgrade).
+- **context_attachment_chip_test.dart**: 2 testes confirmando remoção efetiva do registro no banco + múltiplos anexos coexistem.
 
 ## [0.19.0] - 2026-07-05
 
