@@ -386,8 +386,6 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       // 3. Carrega mensagens reais do banco (substitui as temporárias)
-      _thinkingStopwatch.stop();
-      setState(() => _isStreaming = false);
       await _loadMessages(_activeConversationId!);
     } on AnthropicException catch (e) {
       if (mounted) {
@@ -410,7 +408,13 @@ class _ChatScreenState extends State<ChatScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      _thinkingStopwatch.stop();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isStreaming = false;
+        });
+      }
     }
   }
 
