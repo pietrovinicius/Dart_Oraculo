@@ -57,7 +57,7 @@ test/
 
 - **TDD obrigatório:** RED → GREEN → REFACTOR. Nenhum código de produção sem teste falhando antes.
 - **Commits:** Conventional Commits em português — `tipo(escopo): descrição vX.Y.Z`
-- **Changelog:** Fragments em `changelog/`, nunca editar CHANGELOG.md diretamente.
+- **Changelog (OBRIGATÓRIO):** Todo commit que altere comportamento, corrija bug, ou adicione feature DEVE incluir um fragment em `changelog/`. Nome: `changelog_vX.Y.Z_YYYY-MM-DD_slug.md`. Formato Keep a Changelog. Nunca editar CHANGELOG.md diretamente. Commitar fragment junto com o código. Sem exceção.
 - **State:** ChangeNotifier para controllers, setState para UI efêmera. Sem package externo.
 - **Imutabilidade:** Sempre criar novos objetos, nunca mutar existentes.
 - **Arquivos:** < 400 linhas ideal, 800 max. Funções < 50 linhas.
