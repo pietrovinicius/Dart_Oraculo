@@ -3,10 +3,10 @@ import 'dart:io' as io;
 import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -67,6 +67,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _stopRequested = false;
   String? _lastFailedQuestion;
   bool _showScrollToBottom = false;
+  bool _isDragOver = false;
 
   @override
   void initState() {
@@ -374,6 +375,40 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isStreaming = false;
   final _thinkingStopwatch = Stopwatch();
 
+  Future<void> _onDropDone(DropDoneDetails details) async {
+    setState(() => _isDragOver = false);
+
+    if (details.files.isEmpty) return;
+    final file = details.files.first;
+
+    // Valida extensão
+    final ext = file.name.split('.').last.toLowerCase();
+    const validExts = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
+    if (!validExts.contains(ext)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Formato inválido: .$ext — aceito: JPG, PNG, GIF, WebP'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Lê bytes e reusar fluxo existente
+    final bytes = await file.readAsBytes();
+    final mediaType = ext == 'jpg' || ext == 'jpeg'
+        ? 'image/jpeg'
+        : ext == 'gif'
+            ? 'image/gif'
+            : ext == 'webp'
+                ? 'image/webp'
+                : 'image/png';
+
+    _sendMessageWithImage('', Uint8List.fromList(bytes), mediaType);
+  }
+
   Future<void> _sendMessageWithImage(
     String text,
     Uint8List bytes,
@@ -673,7 +708,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
           // Painel principal
           Expanded(
-            child: Column(
+            child: DropTarget(
+              onDragDone: _onDropDone,
+              onDragEntered: (_) => setState(() => _isDragOver = true),
+              onDragExited: (_) => setState(() => _isDragOver = false),
+              child: Stack(
+                children: [
+                  Column(
               children: [
                 // Toolbar
                 _buildToolbar(),
@@ -721,6 +762,37 @@ class _ChatScreenState extends State<ChatScreen> {
                   onStop: () => setState(() => _stopRequested = true),
                 ),
               ],
+            ),
+                  // Overlay visual durante drag
+                  if (_isDragOver)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.accentOrange.withValues(alpha: 0.08),
+                          border: Border.all(
+                            color: AppColors.accentOrange.withValues(alpha: 0.5),
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.image_outlined,
+                                  size: 48,
+                                  color: AppColors.accentOrange.withValues(alpha: 0.7)),
+                              const SizedBox(height: 8),
+                              Text('Solte a imagem aqui',
+                                  style: AppTextStyles.bodyLarge.copyWith(
+                                    color: AppColors.accentOrange)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ],
