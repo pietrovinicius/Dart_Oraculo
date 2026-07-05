@@ -211,6 +211,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadMessages(int conversationId) async {
     final msgs = await _chatController?.getMessages(conversationId) ?? [];
     final feedbacks = await _chatController?.getFeedbacksForConversation(conversationId) ?? {};
+
+    // Carrega citações reais (chunk_id → filename, page)
+    await _loadCitationCache(msgs);
+
     if (mounted) {
       setState(() {
         _activeConversationId = conversationId;
@@ -218,6 +222,36 @@ class _ChatScreenState extends State<ChatScreen> {
         _feedbacks = feedbacks;
       });
       _scrollToBottom();
+    }
+  }
+
+  Future<void> _loadCitationCache(List<Message> messages) async {
+    final db = await DatabaseHelper.instance.database;
+    final allChunkIds = <int>{};
+    for (final msg in messages) {
+      if (msg.chunksUsed != null) {
+        try {
+          final ids = jsonDecode(msg.chunksUsed!) as List;
+          allChunkIds.addAll(ids.cast<int>());
+        } catch (_) {}
+      }
+    }
+    if (allChunkIds.isEmpty) return;
+
+    final placeholders = allChunkIds.map((_) => '?').join(',');
+    final rows = await db.rawQuery(
+      'SELECT c.id, d.filename, c.page FROM chunks c '
+      'JOIN documents d ON d.id = c.document_id '
+      'WHERE c.id IN ($placeholders)',
+      allChunkIds.toList(),
+    );
+
+    _citationCache = {};
+    for (final row in rows) {
+      final id = row['id'] as int;
+      final filename = row['filename'] as String;
+      final page = row['page'] as int?;
+      _citationCache[id] = CitationData(filename: filename, page: page);
     }
   }
 
@@ -557,13 +591,15 @@ class _ChatScreenState extends State<ChatScreen> {
     return io.File(path).readAsBytes();
   }
 
+  // Cache de chunk_id → {filename, page} para citações
+  Map<int, CitationData> _citationCache = {};
+
   List<CitationData> _parseCitations(Message message) {
     if (message.chunksUsed == null) return [];
     try {
       final ids = jsonDecode(message.chunksUsed!) as List;
-      // Citações simplificadas — em produção faria lookup no banco
       return ids
-          .map((id) => CitationData(filename: 'chunk #$id'))
+          .map((id) => _citationCache[id as int] ?? CitationData(filename: 'doc #$id'))
           .toList();
     } catch (_) {
       return [];
