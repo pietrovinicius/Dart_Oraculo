@@ -841,12 +841,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final showSidebar = _sidebarVisible && screenWidth >= 800;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Row(
         children: [
-          // Sidebar
-          if (_sidebarVisible)
+          // Sidebar (oculta automaticamente em telas < 800px)
+          if (showSidebar)
             Sidebar(
               collections: _collections,
               activeCollectionId: _activeCollectionId,
@@ -867,7 +870,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
 
           // Divider
-          if (_sidebarVisible)
+          if (showSidebar)
             const VerticalDivider(
               width: 1,
               color: AppColors.divider,
