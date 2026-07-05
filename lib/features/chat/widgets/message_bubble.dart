@@ -16,6 +16,7 @@ class MessageBubble extends StatelessWidget {
     required this.isUser,
     this.modelUsed,
     this.feedback,
+    this.isVerifying = false,
     this.onFeedbackChanged,
     this.timestamp,
     this.onEdit,
@@ -26,6 +27,7 @@ class MessageBubble extends StatelessWidget {
   final bool isUser;
   final String? modelUsed;
   final String? feedback;
+  final bool isVerifying;
   final void Function(String? value)? onFeedbackChanged;
   final DateTime? timestamp;
   final void Function(String newText)? onEdit;
@@ -159,6 +161,16 @@ class MessageBubble extends StatelessWidget {
                   // Feedback
                   if (!isUser && onFeedbackChanged != null) ...[
                     const SizedBox(width: 4),
+                    if (isVerifying)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.accentOrange,
+                        ),
+                      )
+                    else
                     _FeedbackButton(
                       icon: Icons.thumb_up_outlined,
                       activeIcon: Icons.thumb_up,

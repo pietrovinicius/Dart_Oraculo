@@ -293,6 +293,34 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _deleteConversation(int id) async {
+    final conv = _conversations.where((c) => c.id == id).firstOrNull;
+    final title = conv?.title ?? 'esta conversa';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Excluir conversa', style: AppTextStyles.bodyLarge),
+        content: Text(
+          'Excluir "$title"? Esta ação não pode ser desfeita.',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     await _chatController?.deleteConversation(id);
     await _refreshConversations();
     if (_activeConversationId == id) {
@@ -865,30 +893,25 @@ class _ChatScreenState extends State<ChatScreen> {
                 Expanded(
                   child: _activeConversationId == null
                       ? _buildEmptyState()
-                      : AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          switchInCurve: Curves.easeOut,
-                          child: Stack(
-                            key: ValueKey<int?>(_activeConversationId),
-                            children: [
-                              NotificationListener<ScrollNotification>(
-                                onNotification: _handleScrollNotification,
-                                child: _buildMessageList(),
-                              ),
-                              if (_showScrollToBottom)
-                                Positioned(
-                                  right: 16,
-                                  bottom: 16,
-                                  child: FloatingActionButton.small(
-                                    onPressed: _scrollToBottom,
-                                    backgroundColor: AppColors.surface,
-                                    foregroundColor: AppColors.accentOrange,
-                                    elevation: 4,
-                                    child: const Icon(Icons.keyboard_arrow_down),
-                                  ),
+                      : Stack(
+                          children: [
+                            NotificationListener<ScrollNotification>(
+                              onNotification: _handleScrollNotification,
+                              child: _buildMessageList(),
+                            ),
+                            if (_showScrollToBottom)
+                              Positioned(
+                                right: 16,
+                                bottom: 80,
+                                child: FloatingActionButton.small(
+                                  onPressed: _scrollToBottom,
+                                  backgroundColor: AppColors.surface,
+                                  foregroundColor: AppColors.accentOrange,
+                                  elevation: 4,
+                                  child: const Icon(Icons.keyboard_arrow_down),
                                 ),
-                            ],
-                          ),
+                              ),
+                          ],
                         ),
                 ),
 
@@ -1227,6 +1250,8 @@ class _ChatScreenState extends State<ChatScreen> {
               isUser: isUser,
               modelUsed: isUser ? null : message.modelUsed,
               feedback: isUser ? null : _feedbacks[message.id],
+              isVerifying: !isUser && message.id != null &&
+                  _feedbackInProgress.contains(message.id),
               onFeedbackChanged: (isUser || message.id == null)
                   ? null
                   : (value) => _onFeedbackChanged(message.id!, value),
