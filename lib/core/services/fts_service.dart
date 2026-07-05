@@ -52,7 +52,8 @@ class FtsService {
 
     var rows = await _executeSearch(sanitized, collectionId, effectiveLimit);
 
-    // Fallback: se AND retorna vazio e há múltiplos termos, tenta OR
+    // Fallback cascata:
+    // 1. Se AND retorna vazio e há múltiplos termos → OR
     if (rows.isEmpty && sanitized.contains(' ')) {
       final orQuery = sanitized
           .split(' ')
@@ -61,6 +62,20 @@ class FtsService {
       LoggerService.instance.info(_tag,
           'AND retornou 0 → fallback OR: "$orQuery"');
       rows = await _executeSearch(orQuery, collectionId, effectiveLimit);
+    }
+
+    // 2. Se ainda vazio → prefix match no primeiro termo
+    if (rows.isEmpty) {
+      final firstTerm = sanitized
+          .replaceAll('"', '')
+          .split(' ')
+          .firstWhere((t) => t.isNotEmpty, orElse: () => '');
+      if (firstTerm.isNotEmpty) {
+        final prefixQuery = '$firstTerm*';
+        LoggerService.instance.info(_tag,
+            'OR retornou 0 → fallback prefix: "$prefixQuery"');
+        rows = await _executeSearch(prefixQuery, collectionId, effectiveLimit);
+      }
     }
 
     return rows.map((row) => FtsResult(
@@ -103,9 +118,9 @@ class FtsService {
     ''', args);
   }
 
-  // Stopwords pt-BR + en comuns — removidas da query FTS5
+  // Stopwords pt-BR + en — removidas da query FTS5
   static const _stopwords = <String>{
-    // Português
+    // Português — artigos, preposições, pronomes
     'a', 'o', 'e', 'é', 'de', 'do', 'da', 'dos', 'das',
     'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'uns', 'umas',
     'por', 'para', 'com', 'sem', 'que', 'se', 'ou', 'mas',
@@ -114,6 +129,13 @@ class FtsService {
     'me', 'te', 'lhe', 'ao', 'aos', 'as', 'os',
     'voce', 'você', 'meu', 'sua', 'seu', 'não', 'nao',
     'ser', 'ter', 'há', 'ha', 'foi', 'são', 'sao',
+    // Português — verbos/palavras comuns em perguntas
+    'tem', 'pode', 'sabe', 'sabre', 'faz', 'fazer',
+    'sobre', 'cima', 'dessa', 'nessa', 'desse', 'nesse',
+    'existe', 'existir', 'qual', 'quais', 'onde', 'quando',
+    'algum', 'alguma', 'alguns', 'algumas',
+    'mais', 'muito', 'tambem', 'também', 'ainda', 'já', 'ja',
+    'aqui', 'ali', 'lá', 'la', 'sim', 'favor',
     // Inglês
     'the', 'an', 'is', 'are', 'was', 'were', 'be',
     'of', 'and', 'or', 'in', 'on', 'at', 'to', 'for',
@@ -122,13 +144,19 @@ class FtsService {
 
   bool _isStopword(String word) => _stopwords.contains(word.toLowerCase());
 
-  /// Sanitiza query para FTS5:
-  /// 1. Preserva underscores (ADEP_V → busca exata como frase)
-  /// 2. Remove stopwords pt/en
-  /// 3. Usa AND implícito (FTS5 default: espaço entre termos = AND)
-  /// 4. Termos com underscore viram phrase match ("ADEP_V")
+  /// Termo técnico: contém underscore OU é ALLCAPS (≥3 chars).
+  bool _isTechnicalTerm(String word) {
+    if (word.contains('_')) return true;
+    if (word.length >= 3 && word == word.toUpperCase() &&
+        word.contains(RegExp(r'[A-Z]'))) return true;
+    return false;
+  }
+
+  /// Sanitiza query para FTS5 priorizando termos técnicos:
+  /// 1. Remove stopwords
+  /// 2. Se há termos técnicos (ALLCAPS/underscore) → usa só eles
+  /// 3. Termos com underscore viram phrase match
   String _sanitizeQuery(String query) {
-    // Remove caracteres especiais exceto underscore e letras acentuadas
     final cleaned = query.replaceAll(RegExp(r'[^\w\s\p{L}_]', unicode: true), ' ');
     final words = cleaned.split(RegExp(r'\s+'))
         .where((w) => w.isNotEmpty && !_isStopword(w))
@@ -136,8 +164,14 @@ class FtsService {
 
     if (words.isEmpty) return '';
 
-    // Termos com underscore → phrase match (FTS5 tokeniza underscore como separador)
-    // Outros termos → AND implícito (sem operador = AND no FTS5)
-    return words.map((w) => w.contains('_') ? '"$w"' : w).join(' ');
+    // Separa técnicos de comuns
+    final technical = words.where(_isTechnicalTerm).toList();
+
+    // Prioriza termos técnicos se existem
+    final priority = technical.isNotEmpty ? technical : words;
+
+    return priority
+        .map((w) => w.contains('_') ? '"$w"' : w)
+        .join(' ');
   }
 }
