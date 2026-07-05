@@ -313,6 +313,51 @@ class _ChatScreenState extends State<ChatScreen> {
     await _refreshConversations();
   }
 
+  Future<void> _exportConversation(int id) async {
+    if (_chatController == null) return;
+    try {
+      final markdown = await _chatController!.exportConversationAsMarkdown(id);
+      if (markdown.isEmpty) return;
+
+      // Busca título para nome do arquivo
+      final conv = _conversations.where((c) => c.id == id).firstOrNull;
+      final title = conv?.title ?? 'conversa';
+      final safeTitle = title.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
+      final now = DateTime.now();
+      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final filename = '${safeTitle}_$dateStr.md';
+
+      // Salva via file picker
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Exportar conversa',
+        fileName: filename,
+        type: FileType.custom,
+        allowedExtensions: ['md'],
+      );
+
+      if (result != null) {
+        await io.File(result).writeAsString(markdown);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Conversa exportada com sucesso'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao exportar: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   void _openLibrary() {
     if (_documentService == null) return;
     Navigator.push(
@@ -710,6 +755,7 @@ class _ChatScreenState extends State<ChatScreen> {
               onDeleteConversation: _deleteConversation,
               onRenameConversation: _renameConversation,
               onTogglePin: _togglePin,
+              onExportConversation: _exportConversation,
               documentCount: _documentCount,
               onOpenDocuments: _importDocument,
               onOpenLibrary: _openLibrary,

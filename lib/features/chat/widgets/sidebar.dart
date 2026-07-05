@@ -21,6 +21,7 @@ class Sidebar extends StatelessWidget {
     required this.onDeleteConversation,
     required this.onRenameConversation,
     required this.onTogglePin,
+    this.onExportConversation,
     required this.documentCount,
     required this.onOpenDocuments,
     required this.onOpenLibrary,
@@ -38,6 +39,7 @@ class Sidebar extends StatelessWidget {
   final void Function(int id) onDeleteConversation;
   final void Function(int id, String newTitle) onRenameConversation;
   final void Function(int id, bool pinned) onTogglePin;
+  final void Function(int id)? onExportConversation;
   final int documentCount;
   final VoidCallback onOpenDocuments;
   final VoidCallback onOpenLibrary;
@@ -137,6 +139,16 @@ class Sidebar extends StatelessWidget {
                                 ],
                               ),
                             ),
+                            const PopupMenuItem(
+                              value: 'export',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.download_outlined, size: 16, color: AppColors.textSecondary),
+                                  SizedBox(width: 8),
+                                  Text('Exportar .md', style: AppTextStyles.bodyMedium),
+                                ],
+                              ),
+                            ),
                             PopupMenuItem(
                               value: 'delete',
                               child: Row(
@@ -154,6 +166,8 @@ class Sidebar extends StatelessWidget {
                                 _showRenameDialog(context, conv);
                               case 'pin':
                                 onTogglePin(conv.id!, !conv.pinned);
+                              case 'export':
+                                onExportConversation?.call(conv.id!);
                               case 'delete':
                                 onDeleteConversation(conv.id!);
                             }

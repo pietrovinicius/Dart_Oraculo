@@ -547,4 +547,127 @@ class ChatController extends ChangeNotifier {
       whereArgs: [conversationId, afterMessageId],
     );
   }
+
+  // --- Exportação de conversa ---
+
+  /// Exporta conversa completa como markdown formatado.
+  Future<String> exportConversationAsMarkdown(int conversationId) async {
+    // Busca conversa
+    final convRows = await _db.query(
+      'conversations',
+      where: 'id = ?',
+      whereArgs: [conversationId],
+    );
+    if (convRows.isEmpty) return '';
+    final conv = convRows.first;
+    final title = conv['title'] as String? ?? 'Sem título';
+    final collectionId = conv['collection_id'] as int?;
+
+    // Busca nome da coleção
+    String collectionName = 'Sem coleção';
+    if (collectionId != null) {
+      final colRows = await _db.query(
+        'collections',
+        where: 'id = ?',
+        whereArgs: [collectionId],
+      );
+      if (colRows.isNotEmpty) {
+        collectionName = colRows.first['name'] as String;
+      }
+    }
+
+    // Busca mensagens
+    final messages = await getMessages(conversationId);
+
+    // Header
+    final now = DateTime.now();
+    final exportDate = '${now.day.toString().padLeft(2, '0')}/'
+        '${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final exportTime = '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}';
+
+    final buffer = StringBuffer();
+    buffer.writeln('# Conversa: $title');
+    buffer.writeln();
+    buffer.writeln('*Exportado em $exportDate às $exportTime | Coleção: $collectionName*');
+    buffer.writeln();
+    buffer.writeln('---');
+
+    // Mensagens
+    for (final msg in messages) {
+      buffer.writeln();
+      final time = '${msg.createdAt.hour.toString().padLeft(2, '0')}:'
+          '${msg.createdAt.minute.toString().padLeft(2, '0')}';
+
+      if (msg.role == 'user') {
+        buffer.writeln('## 👤 Usuário ($time)');
+        buffer.writeln();
+        if (msg.imagePath != null) {
+          buffer.writeln('📎 *[imagem anexada]*');
+          buffer.writeln();
+        }
+        buffer.writeln(msg.content);
+      } else {
+        final model = msg.modelUsed ?? 'desconhecido';
+        buffer.writeln('## 🤖 Assistente ($time) — $model');
+        buffer.writeln();
+        buffer.writeln(msg.content);
+
+        // Fontes citadas
+        if (msg.chunksUsed != null) {
+          try {
+            final ids = (jsonDecode(msg.chunksUsed!) as List).cast<int>();
+            if (ids.isNotEmpty) {
+              final citations = await _buildCitationLabels(ids);
+              if (citations.isNotEmpty) {
+                buffer.writeln();
+                buffer.writeln('**Fontes:** ${citations.join(', ')}');
+              }
+            }
+          } catch (_) {}
+        }
+      }
+
+      buffer.writeln();
+      buffer.writeln('---');
+    }
+
+    return buffer.toString();
+  }
+
+  /// Monta labels de citação para IDs de chunks.
+  Future<List<String>> _buildCitationLabels(List<int> chunkIds) async {
+    final placeholders = chunkIds.map((_) => '?').join(',');
+    final rows = await _db.rawQuery(
+      'SELECT c.id, c.source_type, c.page, c.created_at, d.filename '
+      'FROM chunks c JOIN documents d ON d.id = c.document_id '
+      'WHERE c.id IN ($placeholders)',
+      chunkIds,
+    );
+
+    final labels = <String>[];
+    final seen = <String>{};
+    for (final row in rows) {
+      final sourceType = row['source_type'] as String? ?? 'document';
+      final String label;
+      if (sourceType == 'promoted_answer') {
+        final createdAt = row['created_at'] as String?;
+        final dt = createdAt != null ? DateTime.tryParse(createdAt) : null;
+        final dateStr = dt != null
+            ? '${dt.day.toString().padLeft(2, '0')}/'
+              '${dt.month.toString().padLeft(2, '0')}/${dt.year}'
+            : '?';
+        label = 'Resposta aprovada ($dateStr)';
+      } else {
+        final filename = row['filename'] as String;
+        final page = row['page'] as int?;
+        label = page != null ? '$filename (p.$page)' : filename;
+      }
+      if (!seen.contains(label)) {
+        seen.add(label);
+        labels.add(label);
+      }
+    }
+    return labels;
+  }
 }
