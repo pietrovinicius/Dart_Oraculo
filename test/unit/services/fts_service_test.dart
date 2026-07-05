@@ -18,7 +18,7 @@ void main() {
         version: 4,
         singleInstance: false,
         onCreate: (db, version) async {
-          for (final sql in Migrations.allV7) {
+          for (final sql in Migrations.allV8) {
             await db.execute(sql);
           }
         },

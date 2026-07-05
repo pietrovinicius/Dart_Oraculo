@@ -58,7 +58,8 @@ class AnthropicService implements GenerationService {
         '"Não encontrei essa informação nos documentos indexados."\n'
         '3. Cite o documento fonte e página quando possível.\n'
         '4. Se o contexto contém informação parcial, mencione o que encontrou e o que falta.\n'
-        '5. NÃO invente informação que não está no contexto.\n\n'
+        '5. NÃO invente informação que não está no contexto.\n'
+        '6. Se usar informação de um DOCUMENTO DE TRABALHO, cite o nome do documento na resposta.\n\n'
         '--- CONTEXTO (recuperado via busca nos documentos) ---\n'
         '$context\n'
         '--- FIM DO CONTEXTO ---';

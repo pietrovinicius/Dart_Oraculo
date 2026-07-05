@@ -178,10 +178,34 @@ class ChatController extends ChangeNotifier {
       contextBuffer.writeln(truncatedContent);
       contextBuffer.writeln();
     }
+    // 2b. Injeta documentos de trabalho da conversa (context attachments)
+    final attachments = await getContextAttachments(conversationId);
+    if (attachments.isNotEmpty) {
+      contextBuffer.writeln();
+      for (final att in attachments) {
+        final attContent = att['content'] as String;
+        final attFilename = att['filename'] as String;
+        final String injected;
+        if (attContent.length > maxChars) {
+          injected = '${attContent.substring(0, maxChars)}\n'
+              '[... documento de trabalho truncado. Total: ${attContent.length} chars.]';
+        } else {
+          injected = attContent;
+        }
+        contextBuffer.writeln('--- DOCUMENTO DE TRABALHO: $attFilename ---');
+        contextBuffer.writeln(injected);
+        contextBuffer.writeln('--- FIM DOCUMENTO DE TRABALHO ---');
+        contextBuffer.writeln();
+      }
+      LoggerService.instance.info(_tag,
+          'Docs de trabalho: ${attachments.length} anexos injetados');
+    }
+
     final context = contextBuffer.toString();
     LoggerService.instance.info(_tag,
         'Contexto montado: ${(context.length / 1024).toStringAsFixed(1)}KB '
-        '(${ftsResults.length} chunks, truncados: $truncatedCount)');
+        '(${ftsResults.length} chunks, truncados: $truncatedCount, '
+        'docs trabalho: ${attachments.length})');
 
     // 3. Recupera histórico recente da conversa
     final allMessages = await getMessages(conversationId);
@@ -536,6 +560,46 @@ class ChatController extends ChangeNotifier {
       result[row['message_id'] as int] = row['value'] as String?;
     }
     return result;
+  }
+
+  // --- Context Attachments (documentos de trabalho por conversa) ---
+
+  /// Adiciona um documento de trabalho à conversa.
+  Future<void> addContextAttachment(
+    int conversationId,
+    String filename,
+    String content,
+  ) async {
+    await _db.insert('conversation_context_attachments', {
+      'conversation_id': conversationId,
+      'filename': filename,
+      'content': content,
+      'added_at': DateTime.now().toIso8601String(),
+    });
+    LoggerService.instance.info(_tag,
+        'Context attachment adicionado: "$filename" (${content.length} chars) na conv=$conversationId');
+    notifyListeners();
+  }
+
+  /// Retorna todos os attachments de uma conversa.
+  Future<List<Map<String, dynamic>>> getContextAttachments(int conversationId) async {
+    return _db.query(
+      'conversation_context_attachments',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+      orderBy: 'added_at ASC',
+    );
+  }
+
+  /// Remove um attachment específico.
+  Future<void> removeContextAttachment(int attachmentId) async {
+    await _db.delete(
+      'conversation_context_attachments',
+      where: 'id = ?',
+      whereArgs: [attachmentId],
+    );
+    LoggerService.instance.info(_tag, 'Context attachment removido: id=$attachmentId');
+    notifyListeners();
   }
 
   /// Deleta todas as mensagens com id > [afterMessageId] na conversa.

@@ -221,4 +221,27 @@ class Migrations {
     ...allV6,
     addVerifyBeforePromoteToCollections,
   ];
+
+  // --- V8: conversation_context_attachments ---
+
+  static const String createConversationContextAttachments = '''
+    CREATE TABLE IF NOT EXISTS conversation_context_attachments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+      filename TEXT NOT NULL,
+      content TEXT NOT NULL,
+      added_at TEXT NOT NULL
+    );
+  ''';
+
+  /// Migrations incrementais v7 → v8.
+  static List<String> get upgradeV7toV8 => [
+    createConversationContextAttachments,
+  ];
+
+  /// Fresh install completo (v8).
+  static List<String> get allV8 => [
+    ...allV7,
+    createConversationContextAttachments,
+  ];
 }
