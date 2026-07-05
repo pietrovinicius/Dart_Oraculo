@@ -5,6 +5,35 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.20.0] - 2026-07-05
+
+### Adicionado
+- **migrations.dart**: Migration v8 — tabela `conversation_context_attachments` para documentos de trabalho por conversa.
+- **chat_controller.dart**: Métodos `addContextAttachment`, `getContextAttachments`, `removeContextAttachment`.
+- **chat_controller.dart**: Injeção automática de documentos de trabalho no prompt (rotulados, truncados se excedem limite do motor).
+- **anthropic_service.dart**: Instrução #6 no prompt: "cite nome do DOCUMENTO DE TRABALHO quando usar informação dele".
+- **chat_screen.dart**: Diálogo de destino ao soltar/selecionar .md — "Adicionar à biblioteca" ou "Usar nesta conversa".
+- **chat_screen.dart**: Indicador no cabeçalho (chip "📎 N docs") com menu para remover attachments individuais.
+- **chat_screen.dart**: Drop de .md agora aceito no DropTarget (antes só imagens).
+- **context_attachment_test.dart**: 3 testes unitários (injeção, truncagem, ausência após remoção).
+- **migration_v8_test.dart**: 2 testes (fresh install, upgrade).
+
+## [0.19.0] - 2026-07-05
+
+### Adicionado
+- **chat_controller.dart**: Método `exportConversationAsMarkdown()` — gera markdown completo com cabeçalho, mensagens, modelo, fontes citadas, nota de imagem anexada.
+- **chat_controller.dart**: `_buildCitationLabels()` — diferencia citações de documento original vs resposta promovida.
+- **sidebar.dart**: Opção "Exportar .md" no menu de contexto de cada conversa (ícone download).
+- **chat_screen.dart**: `_exportConversation()` — file picker save dialog + feedback sucesso/erro.
+- **export_conversation_test.dart**: 3 testes unitários (formato, imagem, citações diferenciadas).
+
+### Corrigido
+- **secure_storage_service.dart**: Adicionado `accessibility: KeychainAccessibility.first_unlock` para evitar prompt de senha do macOS a cada acesso ao Keychain.
+- **chat_screen.dart**: Guard `positions.length == 1` em `_scrollToBottom()` — evita crash "ScrollController attached to multiple scroll views".
+- **chat_screen.dart**: Debounce no botão like — impede cliques múltiplos durante verificação de fidelidade. Lock por messageId.
+- **chat_screen.dart**: Feedback visual imediato no like antes da verificação terminar.
+- **chat_screen.dart**: Dialog de confirmação com `barrierDismissible: false`.
+
 ## [0.17.1] - 2026-07-05
 
 ### Segurança
