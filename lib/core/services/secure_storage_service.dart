@@ -58,6 +58,12 @@ class SecureStorageService {
   Future<void> setBiometricEnabled(bool enabled) =>
       _write(StorageKeys.biometricEnabled, enabled.toString());
 
+  // --- Acesso genérico (para ThemeNotifier e futuros) ---
+
+  Future<String?> readRaw(String key) => _read(key);
+
+  Future<void> writeRaw(String key, String value) => _write(key, value);
+
   // --- Internal: read/write/delete (Keychain only, no fallback) ---
 
   Future<String?> _read(String key) async {

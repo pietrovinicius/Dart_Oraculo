@@ -39,7 +39,9 @@ import 'widgets/sidebar.dart';
 
 /// Tela principal — sidebar + painel de chat.
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({super.key, this.themeNotifier});
+
+  final dynamic themeNotifier; // ThemeNotifier (optional, for passing to settings)
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();

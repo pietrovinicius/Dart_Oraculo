@@ -5,11 +5,14 @@ import '../../core/services/logger_service.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/theme_notifier.dart';
 import 'settings_controller.dart';
 
-/// Tela de configurações — chave API, modelo padrão, toggle biometria.
+/// Tela de configurações — chave API, modelo padrão, toggle biometria, tema.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.themeNotifier});
+
+  final dynamic themeNotifier; // ThemeNotifier
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -75,6 +78,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildApiKeySection(),
                   const SizedBox(height: 32),
                   _buildModelSection(),
+                  const SizedBox(height: 32),
+                  _buildThemeSection(),
                   const SizedBox(height: 32),
                   _buildBiometricSection(),
                 ],
@@ -233,6 +238,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
           value: _controller.biometricEnabled,
           activeThumbColor: AppColors.accentOrange,
           onChanged: (value) => _controller.saveBiometric(value),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThemeSection() {
+    final notifier = widget.themeNotifier;
+    if (notifier is! ThemeNotifier) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Aparência', style: AppTextStyles.bodyLarge),
+        const SizedBox(height: 12),
+        ListenableBuilder(
+          listenable: notifier,
+          builder: (context, _) => Column(
+            children: [
+              RadioListTile<ThemeMode>(
+                title: const Text('☀️  Claro', style: AppTextStyles.bodyMedium),
+                value: ThemeMode.light,
+                groupValue: notifier.mode,
+                activeColor: AppColors.accentOrange,
+                onChanged: (v) => notifier.setMode(v!),
+              ),
+              RadioListTile<ThemeMode>(
+                title: const Text('🌙  Escuro', style: AppTextStyles.bodyMedium),
+                value: ThemeMode.dark,
+                groupValue: notifier.mode,
+                activeColor: AppColors.accentOrange,
+                onChanged: (v) => notifier.setMode(v!),
+              ),
+              RadioListTile<ThemeMode>(
+                title: const Text('🖥️  Sistema', style: AppTextStyles.bodyMedium),
+                subtitle: const Text('Segue configuração do macOS',
+                    style: AppTextStyles.bodySmall),
+                value: ThemeMode.system,
+                groupValue: notifier.mode,
+                activeColor: AppColors.accentOrange,
+                onChanged: (v) => notifier.setMode(v!),
+              ),
+            ],
+          ),
         ),
       ],
     );

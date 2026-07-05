@@ -23,4 +23,14 @@ class AppColors {
   static const Color divider = Color(0xFF333333);
   static const Color error = Color(0xFFCF6679);
   static const Color success = Color(0xFF4CAF50);
+
+  // --- Light theme ---
+  static const Color backgroundLight = Color(0xFFFAFAFA);
+  static const Color surfaceLightTheme = Color(0xFFFFFFFF);
+  static const Color surfaceLightAlt = Color(0xFFF0F0F0);
+  static const Color textPrimaryLight = Color(0xFF1A1A1A);
+  static const Color textSecondaryLight = Color(0xFF5A5A5A);
+  static const Color textMutedLight = Color(0xFF9E9E9E);
+  static const Color dividerLight = Color(0xFFE0E0E0);
+  static const Color errorLight = Color(0xFFB00020);
 }
