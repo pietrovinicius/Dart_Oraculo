@@ -7,7 +7,7 @@ class FakeSpeechService extends SpeechService {
   bool _listening = false;
   void Function(String text, bool isFinal)? _onResult;
 
-  FakeSpeechService({this.shouldBeAvailable = true}) : super(speechToText: null);
+  FakeSpeechService({this.shouldBeAvailable = true}) : super(speechToText: null, createDefault: false);
 
   @override
   bool get isListening => _listening;

@@ -1026,6 +1026,9 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
 
+        // Guard: index pode exceder se estado mudou durante rebuild
+        if (index >= _messages.length) return const SizedBox.shrink();
+
         final message = _messages[index];
         final isUser = message.role == 'user';
 

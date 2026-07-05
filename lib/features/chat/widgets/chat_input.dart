@@ -48,7 +48,7 @@ class _ChatInputState extends State<ChatInput> {
   void initState() {
     super.initState();
     _focusNode.addListener(() => _focusNotifier.value = _focusNode.hasFocus);
-    _speechService = widget.speechService ?? SpeechService(speechToText: null);
+    _speechService = widget.speechService ?? SpeechService();
   }
 
   Future<void> _toggleListening() async {

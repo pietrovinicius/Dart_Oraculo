@@ -4,8 +4,8 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 /// Wrapper sobre speech_to_text, injetável e mockável.
 class SpeechService {
-  SpeechService({SpeechToText? speechToText})
-      : _speech = speechToText;
+  SpeechService({SpeechToText? speechToText, bool createDefault = true})
+      : _speech = speechToText ?? (createDefault ? SpeechToText() : null);
 
   final SpeechToText? _speech;
   bool _isAvailable = false;
