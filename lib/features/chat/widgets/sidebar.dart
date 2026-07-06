@@ -100,7 +100,7 @@ class Sidebar extends StatelessWidget {
                           style: AppTextStyles.bodyMedium.copyWith(
                             color: isSelected
                                 ? AppColors.accentOrange
-                                : AppColors.textPrimary,
+                                : Theme.of(context).colorScheme.onSurface,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -109,14 +109,14 @@ class Sidebar extends StatelessWidget {
                         selectedTileColor:
                             AppColors.accentOrange.withValues(alpha: 0.1),
                         trailing: PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
+                          icon: Icon(Icons.more_vert, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
                           color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           itemBuilder: (_) => [
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'rename',
                               child: Row(
                                 children: [
-                                  Icon(Icons.edit, size: 16, color: AppColors.textSecondary),
+                                  Icon(Icons.edit, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                                   SizedBox(width: 8),
                                   Text('Renomear', style: AppTextStyles.bodyMedium),
                                 ],
@@ -139,11 +139,11 @@ class Sidebar extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const PopupMenuItem(
+                            PopupMenuItem(
                               value: 'export',
                               child: Row(
                                 children: [
-                                  Icon(Icons.download_outlined, size: 16, color: AppColors.textSecondary),
+                                  Icon(Icons.download_outlined, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
                                   SizedBox(width: 8),
                                   Text('Exportar .md', style: AppTextStyles.bodyMedium),
                                 ],
@@ -230,7 +230,7 @@ class Sidebar extends StatelessWidget {
             child: DropdownButton<int>(
               value: activeCollectionId,
               isExpanded: true,
-              dropdownColor: AppColors.surfaceLight,
+              dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               style: AppTextStyles.bodyMedium,
               underline: const SizedBox.shrink(),
               items: collections.map((c) => DropdownMenuItem(

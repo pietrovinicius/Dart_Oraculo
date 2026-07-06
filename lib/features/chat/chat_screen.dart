@@ -1003,7 +1003,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         color: AppColors.accentOrange),
                     label: Text('${atts.length} doc${atts.length > 1 ? 's' : ''}',
                         style: AppTextStyles.techSmall),
-                    backgroundColor: AppColors.surfaceLight,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                     side: BorderSide(color: Theme.of(context).dividerColor),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -1031,7 +1031,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Seletor de modelo
           DropdownButton<String>(
             value: _selectedModel,
-            dropdownColor: AppColors.surface,
+            dropdownColor: Theme.of(context).colorScheme.surface,
             style: AppTextStyles.techMedium,
             underline: const SizedBox.shrink(),
             items: const [
@@ -1057,7 +1057,7 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: const Icon(Icons.settings, color: AppColors.textSecondary),
+            icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
           ),
         ],
@@ -1143,7 +1143,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildPromptChip(String text) {
     return ActionChip(
       label: Text(text, style: AppTextStyles.bodySmall),
-      backgroundColor: AppColors.surfaceLight,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       side: BorderSide(color: Theme.of(context).dividerColor),
       onPressed: () async {
         if (_activeConversationId == null) {
@@ -1201,7 +1201,7 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(height: 6),
           LinearProgressIndicator(
             value: _importProgress,
-            backgroundColor: AppColors.surfaceLight,
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
             valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentOrange),
           ),
         ],

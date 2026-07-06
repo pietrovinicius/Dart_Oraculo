@@ -46,13 +46,13 @@ class MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isUser ? AppColors.accentOrange.withValues(alpha: 0.15) : AppColors.surface,
+          color: isUser ? AppColors.accentOrange.withValues(alpha: 0.15) : Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16).copyWith(
             bottomRight: isUser ? const Radius.circular(4) : null,
             bottomLeft: !isUser ? const Radius.circular(4) : null,
           ),
           border: Border.all(
-            color: isUser ? AppColors.accentOrange.withValues(alpha: 0.3) : AppColors.divider,
+            color: isUser ? AppColors.accentOrange.withValues(alpha: 0.3) : Theme.of(context).dividerColor,
           ),
         ),
         child: Column(
@@ -94,7 +94,7 @@ class MessageBubble extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                   code: AppTextStyles.techMedium.copyWith(
-                    backgroundColor: AppColors.surfaceLight,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   codeblockDecoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -224,7 +224,7 @@ class _ActionButton extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(4),
-            child: Icon(icon, size: 14, color: AppColors.textMuted),
+            child: Icon(icon, size: 14, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
           ),
         ),
       ),
@@ -330,9 +330,9 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
           // Header com botão copy
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
             ),
             child: Row(
               children: [
