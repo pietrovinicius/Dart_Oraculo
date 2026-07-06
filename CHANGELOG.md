@@ -5,6 +5,31 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.21.0] - 2026-07-05
+
+### Adicionado
+- **app_colors.dart**: Paleta light completa (background, surface, text, divider).
+- **app_theme.dart**: `AppTheme.light` — ThemeData completo para modo claro.
+- **theme_notifier.dart**: ChangeNotifier que gerencia ThemeMode com persistência no Keychain.
+- **app.dart**: MaterialApp com `theme` + `darkTheme` + `themeMode` reativo via ThemeNotifier.
+- **secure_storage_service.dart**: Métodos `readRaw`/`writeRaw` para acesso genérico ao Keychain.
+- **settings_screen.dart**: Seção "Aparência" com RadioListTile — Claro / Escuro / Sistema.
+
+### Alterado
+- **chat_input.dart**: Layout redesenhado inspirado no Claude Desktop — seletor de modelo dentro do input, mic ao lado do send, botão send com fundo laranja arredondado, disclaimer abaixo.
+- **chat_screen.dart**: Dropdown de modelo removido da toolbar (agora vive no input).
+- **app.dart**: Convertido de StatelessWidget para StatefulWidget para hospedar ThemeNotifier.
+
+### Corrigido
+- **chat_screen.dart**: ~40 refs AppColors migradas para Theme.of(context) (background, surface, divider, text).
+- **sidebar.dart**: Surface, divider, text colors dinâmicos. surfaceContainerLow em light para separação visual.
+- **message_bubble.dart**: Bolha assistant, code block, action buttons usam cores do tema.
+- **citation_strip.dart**: Fundo e chips de citação usam surfaceContainerHighest + dividerColor do tema.
+- **app_text_styles.dart**: Removidas cores hardcoded dos TextStyles — agora herdam do Theme.
+- **settings_screen.dart**: Background usa scaffoldBackgroundColor dinâmico.
+- **sidebar.dart**: Dropdown coleção com cor onSurface — "Geral" legível em light.
+- **chat_screen.dart**: Dropdown modelo com cor onSurface — legível em light.
+
 ## [0.20.0] - 2026-07-05
 
 ### Adicionado
@@ -18,6 +43,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **context_attachment_test.dart**: 3 testes unitários (injeção, truncagem, ausência após remoção).
 - **migration_v8_test.dart**: 2 testes (fresh install, upgrade).
 - **context_attachment_chip_test.dart**: 2 testes confirmando remoção efetiva do registro no banco + múltiplos anexos coexistem.
+- **chat_screen.dart**: Confirmação AlertDialog antes de excluir conversa ("Esta ação não pode ser desfeita").
+- **message_bubble.dart**: Spinner de loading durante verificação de fidelidade no like.
+- **message_bubble.dart**: Code blocks exibem linguagem detectada (SQL, Python, etc.) no header.
+- **chat_controller.dart**: Log detalhado: `N/M anexos injetados (X/Y chars)` mostra quanto do limite foi usado.
+- **message_bubble.dart**: Semantics labels nos botões de ação para acessibilidade.
+- **chat_screen.dart**: Sidebar auto-oculta em telas < 800px de largura.
+
+### Corrigido
+- **chat_controller.dart**: Limite de tamanho de context attachments agora é pela soma total combinada (≤ maxContextCharsPerChunk), não por anexo isolado.
+- **chat_screen.dart**: Removido AnimatedSwitcher do painel de mensagens — causava crash "ScrollController attached to multiple scroll views".
+- **chat_screen.dart**: FAB scroll-to-bottom reposicionado (bottom: 80) para não sobrepor última mensagem.
+
+### Alterado
+- **chat_screen.dart**: Drag overlay reduzido para faixa inferior (120px) — não cobre conteúdo.
+- **chat_input.dart**: Hint text encurtado ("Pergunte ao Oráculo..."). maxLines: null. Botão send com opacity 0.3 quando disabled. AnimatedScale no ícone mic.
+- **message_bubble.dart**: Bolha max-width cap em 800px (não estica em telas largas).
 
 ## [0.19.0] - 2026-07-05
 
