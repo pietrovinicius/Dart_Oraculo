@@ -35,9 +35,9 @@ class CitationStrip extends StatelessWidget {
       margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight.withValues(alpha: 0.5),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.divider),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,14 +52,14 @@ class CitationStrip extends StatelessWidget {
           Wrap(
             spacing: 8,
             runSpacing: 4,
-            children: citations.map((c) => _buildChip(c)).toList(),
+            children: citations.map((c) => _buildChip(context, c)).toList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildChip(CitationData citation) {
+  Widget _buildChip(BuildContext context, CitationData citation) {
     final String label;
     if (citation.sourceType == 'promoted_answer') {
       label = 'Resposta aprovada (${citation.promotedDate ?? "?"})';
@@ -73,11 +73,11 @@ class CitationStrip extends StatelessWidget {
       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       backgroundColor: citation.sourceType == 'promoted_answer'
           ? AppColors.accentOrange.withValues(alpha: 0.1)
-          : AppColors.surface,
+          : Theme.of(context).colorScheme.surface,
       side: BorderSide(
         color: citation.sourceType == 'promoted_answer'
             ? AppColors.accentOrange.withValues(alpha: 0.4)
-            : AppColors.divider,
+            : Theme.of(context).dividerColor,
       ),
       label: Text(label, style: AppTextStyles.techSmall),
       padding: const EdgeInsets.symmetric(horizontal: 4),
