@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/services/clipboard_image_service.dart';
 import '../../../core/services/speech_service.dart';
 import '../../../core/theme/app_colors.dart';
@@ -19,6 +20,8 @@ class ChatInput extends StatefulWidget {
     this.onStop,
     this.clipboardImageService,
     this.speechService,
+    this.selectedModel,
+    this.onModelChanged,
   });
 
   final void Function(String message) onSend;
@@ -29,6 +32,8 @@ class ChatInput extends StatefulWidget {
   final VoidCallback? onStop;
   final ClipboardImageService? clipboardImageService;
   final SpeechService? speechService;
+  final String? selectedModel;
+  final void Function(String model)? onModelChanged;
 
   @override
   State<ChatInput> createState() => _ChatInputState();
@@ -163,6 +168,13 @@ class _ChatInputState extends State<ChatInput> {
     setState(() => _attachedImage = null);
   }
 
+  String _modelLabel(String model) {
+    if (model.contains('sonnet')) return 'Sonnet';
+    if (model.contains('opus')) return 'Opus';
+    if (model.contains('qwen')) return 'Qwen';
+    return model;
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -227,33 +239,17 @@ class _ChatInputState extends State<ChatInput> {
                     ],
                   ),
                 ),
-              // Input row
+              // Input row — TextField
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   // Botão anexar imagem
                   IconButton(
                     icon: const Icon(Icons.attach_file),
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                     tooltip: 'Anexar imagem',
                     onPressed: widget.enabled ? _pickImage : null,
                     iconSize: 20,
-                  ),
-                  // Botão microfone (ditado)
-                  AnimatedScale(
-                    scale: _isListening ? 1.2 : 1.0,
-                    duration: const Duration(milliseconds: 300),
-                    child: IconButton(
-                      icon: Icon(
-                        _isListening ? Icons.mic : Icons.mic_none,
-                      ),
-                      color: _isListening
-                          ? AppColors.accentOrange
-                          : AppColors.textSecondary,
-                      tooltip: _isListening ? 'Parar ditado' : 'Ditado por voz',
-                      onPressed: widget.enabled ? _toggleListening : null,
-                      iconSize: 20,
-                    ),
                   ),
                   Expanded(
                     child: CallbackShortcuts(
@@ -264,26 +260,78 @@ class _ChatInputState extends State<ChatInput> {
                       child: Focus(
                         onKeyEvent: _onKeyEvent,
                         child: TextField(
-                        controller: _controller,
-                        focusNode: _focusNode,
-                        enabled: widget.enabled,
-                        style: AppTextStyles.bodyLarge,
-                        decoration: const InputDecoration(
-                          hintText: 'Pergunte ao Oráculo...',
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          enabled: widget.enabled,
+                          style: AppTextStyles.bodyLarge,
+                          decoration: const InputDecoration(
+                            hintText: 'Pergunte ao Oráculo...',
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                           ),
+                          maxLines: null,
+                          minLines: 1,
+                          textInputAction: TextInputAction.newline,
                         ),
-                        maxLines: null,
-                        minLines: 1,
-                        textInputAction: TextInputAction.newline,
                       ),
                     ),
+                  ),
+                ],
+              ),
+              // Bottom row — modelo + mic + send
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // Seletor de modelo
+                  if (widget.selectedModel != null && widget.onModelChanged != null)
+                    PopupMenuButton<String>(
+                      tooltip: 'Escolher modelo',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _modelLabel(widget.selectedModel!),
+                              style: AppTextStyles.techSmall.copyWith(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                            Icon(Icons.arrow_drop_down,
+                                size: 16,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                          ],
+                        ),
+                      ),
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: AppConfig.modelSonnet, child: Text('Sonnet')),
+                        const PopupMenuItem(value: AppConfig.modelOpus, child: Text('Opus')),
+                        const PopupMenuItem(value: AppConfig.modelQwen, child: Text('Qwen (Local)')),
+                      ],
+                      onSelected: widget.onModelChanged,
+                    ),
+                  const Spacer(),
+                  // Microfone
+                  AnimatedScale(
+                    scale: _isListening ? 1.2 : 1.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: IconButton(
+                      icon: Icon(
+                        _isListening ? Icons.mic : Icons.mic_none,
+                      ),
+                      color: _isListening
+                          ? AppColors.accentOrange
+                          : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                      tooltip: _isListening ? 'Parar ditado' : 'Ditado por voz',
+                      onPressed: widget.enabled ? _toggleListening : null,
+                      iconSize: 22,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
+                  // Send / Stop
                   if (widget.isStreaming)
                     IconButton(
                       icon: const Icon(Icons.stop_circle_outlined),
@@ -292,15 +340,32 @@ class _ChatInputState extends State<ChatInput> {
                       onPressed: widget.onStop,
                     )
                   else
-                    Opacity(
-                      opacity: widget.enabled ? 1.0 : 0.3,
+                    Container(
+                      decoration: BoxDecoration(
+                        color: widget.enabled
+                            ? AppColors.accentOrange
+                            : AppColors.accentOrange.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       child: IconButton(
-                        icon: const Icon(Icons.send_rounded),
-                        color: AppColors.accentOrange,
+                        icon: const Icon(Icons.arrow_upward, size: 20),
+                        color: Colors.white,
                         onPressed: widget.enabled ? _handleSend : null,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        padding: EdgeInsets.zero,
                       ),
                     ),
                 ],
+              ),
+              // Disclaimer
+              const SizedBox(height: 6),
+              Center(
+                child: Text(
+                  'Dart Oráculo é uma IA e pode cometer erros. Verifique as respostas.',
+                  style: AppTextStyles.techSmall.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.35),
+                  ),
+                ),
               ),
             ],
           ),

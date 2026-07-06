@@ -94,7 +94,7 @@ void main() {
       );
 
       await tester.enterText(find.byType(TextField), 'Minha pergunta');
-      await tester.tap(find.byIcon(Icons.send_rounded));
+      await tester.tap(find.byIcon(Icons.arrow_upward));
       await tester.pump();
 
       expect(sentMessage, equals('Minha pergunta'));
@@ -112,7 +112,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byIcon(Icons.send_rounded));
+      await tester.tap(find.byIcon(Icons.arrow_upward));
       await tester.pump();
 
       expect(sentMessage, isNull);

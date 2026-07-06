@@ -927,6 +927,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   enabled: !_isLoading && !_isImporting && _activeConversationId != null,
                   isStreaming: _isStreaming,
                   onStop: () => setState(() => _stopRequested = true),
+                  selectedModel: _selectedModel,
+                  onModelChanged: (model) {
+                    setState(() => _selectedModel = model);
+                    _updateGenerationService(model);
+                  },
                 ),
               ],
             ),
@@ -1028,36 +1033,6 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           const Spacer(),
-          // Seletor de modelo
-          DropdownButton<String>(
-            value: _selectedModel,
-            dropdownColor: Theme.of(context).colorScheme.surface,
-            style: AppTextStyles.techMedium.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            underline: const SizedBox.shrink(),
-            items: const [
-              DropdownMenuItem(
-                value: AppConfig.modelSonnet,
-                child: Text('Sonnet'),
-              ),
-              DropdownMenuItem(
-                value: AppConfig.modelOpus,
-                child: Text('Opus'),
-              ),
-              DropdownMenuItem(
-                value: AppConfig.modelQwen,
-                child: Text('Qwen (Local)'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() => _selectedModel = value);
-                _updateGenerationService(value);
-              }
-            },
-          ),
-          const SizedBox(width: 8),
           IconButton(
             icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
