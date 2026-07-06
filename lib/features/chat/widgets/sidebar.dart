@@ -49,12 +49,12 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 260,
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       child: Column(
         children: [
           // Seletor de coleção
           _buildCollectionSelector(context),
-          const Divider(color: AppColors.divider, height: 1),
+          Divider(color: Theme.of(context).dividerColor, height: 1),
 
           // Header conversas
           Padding(
@@ -71,7 +71,7 @@ class Sidebar extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(color: AppColors.divider, height: 1),
+          Divider(color: Theme.of(context).dividerColor, height: 1),
 
           // Lista de conversas
           Expanded(
@@ -110,7 +110,7 @@ class Sidebar extends StatelessWidget {
                             AppColors.accentOrange.withValues(alpha: 0.1),
                         trailing: PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textMuted),
-                          color: AppColors.surfaceLight,
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           itemBuilder: (_) => [
                             const PopupMenuItem(
                               value: 'rename',
@@ -129,7 +129,7 @@ class Sidebar extends StatelessWidget {
                                   Icon(
                                     conv.pinned ? Icons.push_pin_outlined : Icons.push_pin,
                                     size: 16,
-                                    color: AppColors.textSecondary,
+                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
@@ -180,7 +180,7 @@ class Sidebar extends StatelessWidget {
           ),
 
           // Seção de documentos
-          const Divider(color: AppColors.divider, height: 1),
+          Divider(color: Theme.of(context).dividerColor, height: 1),
           ListTile(
             leading: const Icon(Icons.folder_outlined, color: AppColors.accentOrange),
             title: Text(
@@ -196,7 +196,7 @@ class Sidebar extends StatelessWidget {
           ),
 
           // Rodapé de identificação
-          const Divider(color: AppColors.divider, height: 1),
+          Divider(color: Theme.of(context).dividerColor, height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Column(
@@ -257,7 +257,7 @@ class Sidebar extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Renomear conversa', style: AppTextStyles.bodyLarge),
         content: TextField(
           controller: controller,

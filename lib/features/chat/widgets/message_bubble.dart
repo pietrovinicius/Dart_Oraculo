@@ -97,7 +97,7 @@ class MessageBubble extends StatelessWidget {
                     backgroundColor: AppColors.surfaceLight,
                   ),
                   codeblockDecoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   listBullet: AppTextStyles.bodyLarge,
@@ -321,7 +321,7 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(

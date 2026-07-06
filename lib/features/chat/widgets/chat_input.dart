@@ -179,7 +179,7 @@ class _ChatInputState extends State<ChatInput> {
         return Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: Theme.of(context).colorScheme.surface,
             border: Border(
               top: BorderSide(
                 color: isFocused ? AppColors.accentOrange : AppColors.divider,

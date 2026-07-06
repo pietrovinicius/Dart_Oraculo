@@ -167,7 +167,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Nova coleção', style: AppTextStyles.bodyLarge),
         content: TextField(
           controller: controller,
@@ -301,7 +301,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Excluir conversa', style: AppTextStyles.bodyLarge),
         content: Text(
           'Excluir "$title"? Esta ação não pode ser desfeita.',
@@ -426,7 +426,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Agrupar por qual coluna?', style: AppTextStyles.bodyLarge),
         content: SizedBox(
           width: 300,
@@ -514,7 +514,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Destino do arquivo', style: AppTextStyles.bodyLarge),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -530,7 +530,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: AppTextStyles.techSmall),
               onTap: () => Navigator.pop(ctx, 'library'),
             ),
-            const Divider(color: AppColors.divider),
+            Divider(color: Theme.of(context).dividerColor),
             ListTile(
               leading: const Text('📎', style: TextStyle(fontSize: 24)),
               title: const Text('Usar nesta conversa', style: AppTextStyles.bodyMedium),
@@ -847,7 +847,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final showSidebar = _sidebarVisible && screenWidth >= 800;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Row(
         children: [
           // Sidebar (oculta automaticamente em telas < 800px)
@@ -873,9 +873,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
           // Divider
           if (showSidebar)
-            const VerticalDivider(
+            VerticalDivider(
               width: 1,
-              color: AppColors.divider,
+              color: Theme.of(context).dividerColor,
             ),
 
           // Painel principal
@@ -910,7 +910,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 bottom: 80,
                                 child: FloatingActionButton.small(
                                   onPressed: _scrollToBottom,
-                                  backgroundColor: AppColors.surface,
+                                  backgroundColor: Theme.of(context).colorScheme.surface,
                                   foregroundColor: AppColors.accentOrange,
                                   elevation: 4,
                                   child: const Icon(Icons.keyboard_arrow_down),
@@ -975,16 +975,16 @@ class _ChatScreenState extends State<ChatScreen> {
     return Container(
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.divider)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Row(
         children: [
           IconButton(
             icon: Icon(
               _sidebarVisible ? Icons.menu_open : Icons.menu,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             ),
             onPressed: () => setState(() => _sidebarVisible = !_sidebarVisible),
           ),
@@ -1004,7 +1004,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     label: Text('${atts.length} doc${atts.length > 1 ? 's' : ''}',
                         style: AppTextStyles.techSmall),
                     backgroundColor: AppColors.surfaceLight,
-                    side: const BorderSide(color: AppColors.divider),
+                    side: BorderSide(color: Theme.of(context).dividerColor),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                   itemBuilder: (_) => atts.map((att) => PopupMenuItem<int>(
@@ -1144,7 +1144,7 @@ class _ChatScreenState extends State<ChatScreen> {
     return ActionChip(
       label: Text(text, style: AppTextStyles.bodySmall),
       backgroundColor: AppColors.surfaceLight,
-      side: const BorderSide(color: AppColors.divider),
+      side: BorderSide(color: Theme.of(context).dividerColor),
       onPressed: () async {
         if (_activeConversationId == null) {
           await _createNewConversation();
@@ -1193,7 +1193,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildImportProgress() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: AppColors.surface,
+      color: Theme.of(context).colorScheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1308,17 +1308,17 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 48),
       child: Row(
         children: [
-          const Expanded(child: Divider(color: AppColors.divider)),
+          Expanded(child: Divider(color: Theme.of(context).dividerColor)),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Text(
               _formatDateLabel(date),
               style: AppTextStyles.techSmall.copyWith(
-                color: AppColors.textSecondary,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
           ),
-          const Expanded(child: Divider(color: AppColors.divider)),
+          Expanded(child: Divider(color: Theme.of(context).dividerColor)),
         ],
       ),
     );
@@ -1333,11 +1333,11 @@ class _ChatScreenState extends State<ChatScreen> {
           margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(16).copyWith(
               bottomLeft: const Radius.circular(4),
             ),
-            border: Border.all(color: AppColors.divider),
+            border: Border.all(color: Theme.of(context).dividerColor),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1354,7 +1354,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Text(
                 'Pensando... ${_formatElapsed(elapsed)}',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.textMuted,
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -1392,7 +1392,7 @@ class _ChatScreenState extends State<ChatScreen> {
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            backgroundColor: AppColors.surface,
+            backgroundColor: Theme.of(context).colorScheme.surface,
             title: const Text('Verificação de fundamentação',
                 style: AppTextStyles.bodyLarge),
             content: const Text(
