@@ -1032,7 +1032,9 @@ class _ChatScreenState extends State<ChatScreen> {
           DropdownButton<String>(
             value: _selectedModel,
             dropdownColor: Theme.of(context).colorScheme.surface,
-            style: AppTextStyles.techMedium,
+            style: AppTextStyles.techMedium.copyWith(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
             underline: const SizedBox.shrink(),
             items: const [
               DropdownMenuItem(

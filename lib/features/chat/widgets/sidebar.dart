@@ -233,7 +233,9 @@ class Sidebar extends StatelessWidget {
               value: activeCollectionId,
               isExpanded: true,
               dropdownColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-              style: AppTextStyles.bodyMedium,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
               underline: const SizedBox.shrink(),
               items: collections.map((c) => DropdownMenuItem(
                 value: c.id,
