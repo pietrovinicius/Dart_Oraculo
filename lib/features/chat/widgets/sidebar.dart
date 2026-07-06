@@ -49,7 +49,9 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 260,
-      color: Theme.of(context).colorScheme.surface,
+      color: Theme.of(context).brightness == Brightness.light
+          ? Theme.of(context).colorScheme.surfaceContainerLow
+          : Theme.of(context).colorScheme.surface,
       child: Column(
         children: [
           // Seletor de coleção
