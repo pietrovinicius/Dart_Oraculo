@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'app_colors.dart';
-
 /// Tipografia do Dart Oráculo.
 /// Três famílias: display serifada, corpo sans, técnica mono.
+/// Cores NÃO definidas aqui — vêm do Theme (textTheme) para suportar light/dark.
 class AppTextStyles {
   AppTextStyles._();
 
@@ -12,7 +11,6 @@ class AppTextStyles {
     fontFamily: 'DisplayFont',
     fontSize: 48,
     fontWeight: FontWeight.w700,
-    color: AppColors.accentOrange,
     letterSpacing: -1.0,
   );
 
@@ -20,7 +18,6 @@ class AppTextStyles {
     fontFamily: 'DisplayFont',
     fontSize: 32,
     fontWeight: FontWeight.w700,
-    color: AppColors.textPrimary,
     letterSpacing: -0.5,
   );
 
@@ -29,7 +26,6 @@ class AppTextStyles {
     fontFamily: 'BodyFont',
     fontSize: 16,
     fontWeight: FontWeight.w400,
-    color: AppColors.textPrimary,
     height: 1.5,
   );
 
@@ -37,7 +33,6 @@ class AppTextStyles {
     fontFamily: 'BodyFont',
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    color: AppColors.textSecondary,
     height: 1.4,
   );
 
@@ -45,7 +40,6 @@ class AppTextStyles {
     fontFamily: 'BodyFont',
     fontSize: 12,
     fontWeight: FontWeight.w400,
-    color: AppColors.textMuted,
     height: 1.3,
   );
 
@@ -54,7 +48,6 @@ class AppTextStyles {
     fontFamily: 'TechFont',
     fontSize: 13,
     fontWeight: FontWeight.w400,
-    color: AppColors.textSecondary,
     letterSpacing: 0.5,
   );
 
@@ -62,7 +55,6 @@ class AppTextStyles {
     fontFamily: 'TechFont',
     fontSize: 11,
     fontWeight: FontWeight.w400,
-    color: AppColors.textMuted,
     letterSpacing: 0.3,
   );
 }

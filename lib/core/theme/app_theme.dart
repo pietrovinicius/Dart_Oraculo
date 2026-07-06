@@ -87,6 +87,9 @@ class AppTheme {
       bodySmall: AppTextStyles.bodySmall,
       labelMedium: AppTextStyles.techMedium,
       labelSmall: AppTextStyles.techSmall,
+    ).apply(
+      bodyColor: AppColors.textPrimary,
+      displayColor: AppColors.accentOrange,
     ),
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.surface,
