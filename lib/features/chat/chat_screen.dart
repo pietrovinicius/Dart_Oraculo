@@ -75,7 +75,22 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _loadTextScale();
     _initialize();
+  }
+
+  Future<void> _loadTextScale() async {
+    final saved = await _storageService.readRaw('text_scale');
+    if (saved != null) {
+      final parsed = double.tryParse(saved);
+      if (parsed != null && mounted) {
+        setState(() => _textScale = parsed.clamp(0.5, 2.0));
+      }
+    }
+  }
+
+  Future<void> _saveTextScale() async {
+    await _storageService.writeRaw('text_scale', _textScale.toStringAsFixed(1));
   }
 
   Future<void> _initialize() async {
@@ -851,9 +866,14 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Row(
         children: [
-          // Sidebar (oculta automaticamente em telas < 800px)
-          if (showSidebar)
-            Sidebar(
+          // Sidebar com animação de retrair/expandir
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            width: showSidebar ? 260 : 0,
+            clipBehavior: Clip.hardEdge,
+            decoration: const BoxDecoration(),
+            child: showSidebar ? Sidebar(
               collections: _collections,
               activeCollectionId: _activeCollectionId,
               onCollectionChanged: _onCollectionChanged,
@@ -870,7 +890,8 @@ class _ChatScreenState extends State<ChatScreen> {
               onOpenDocuments: _importDocument,
               onOpenLibrary: _openLibrary,
               appVersion: _appVersion,
-            ),
+            ) : const SizedBox.shrink(),
+          ),
 
           // Divider
           if (showSidebar)
@@ -1044,8 +1065,10 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: Icon(Icons.remove, size: 18,
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             tooltip: 'Diminuir fonte',
-            onPressed: () => setState(() =>
-                _textScale = (_textScale - 0.1).clamp(0.5, 2.0)),
+            onPressed: () {
+              setState(() => _textScale = (_textScale - 0.1).clamp(0.5, 2.0));
+              _saveTextScale();
+            },
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             padding: EdgeInsets.zero,
           ),
@@ -1059,8 +1082,10 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: Icon(Icons.add, size: 18,
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             tooltip: 'Aumentar fonte',
-            onPressed: () => setState(() =>
-                _textScale = (_textScale + 0.1).clamp(0.5, 2.0)),
+            onPressed: () {
+              setState(() => _textScale = (_textScale + 0.1).clamp(0.5, 2.0));
+              _saveTextScale();
+            },
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             padding: EdgeInsets.zero,
           ),
