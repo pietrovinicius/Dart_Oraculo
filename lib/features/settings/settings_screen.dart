@@ -22,6 +22,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final SettingsController _controller;
   final _apiKeyController = TextEditingController();
   bool _obscureKey = true;
+  bool _persistZoom = true;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     _controller.addListener(_onControllerChanged);
     _controller.load();
+    _loadZoomPref();
   }
 
   void _onControllerChanged() {
@@ -80,6 +82,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildModelSection(),
                   const SizedBox(height: 32),
                   _buildThemeSection(),
+                  const SizedBox(height: 32),
+                  _buildZoomSection(),
                   const SizedBox(height: 32),
                   _buildBiometricSection(),
                 ],
@@ -281,6 +285,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  final _storage = SecureStorageService();
+
+  Future<void> _loadZoomPref() async {
+    final saved = await _storage.readRaw('persist_zoom');
+    if (mounted) {
+      setState(() => _persistZoom = saved != 'false');
+    }
+  }
+
+  Widget _buildZoomSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Zoom do chat', style: AppTextStyles.bodyLarge),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          title: const Text(
+            'Lembrar zoom entre sessões',
+            style: AppTextStyles.bodyMedium,
+          ),
+          subtitle: const Text(
+            'Salva o nível de zoom escolhido no chat para a próxima abertura',
+            style: AppTextStyles.bodySmall,
+          ),
+          value: _persistZoom,
+          activeThumbColor: AppColors.accentOrange,
+          onChanged: (value) async {
+            setState(() => _persistZoom = value);
+            await _storage.writeRaw('persist_zoom', value.toString());
+            if (!value) {
+              // Remove zoom salvo para resetar na próxima abertura
+              await _storage.writeRaw('text_scale', '1.0');
+            }
+          },
         ),
       ],
     );

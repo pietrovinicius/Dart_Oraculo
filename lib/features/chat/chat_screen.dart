@@ -90,7 +90,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _saveTextScale() async {
-    await _storageService.writeRaw('text_scale', _textScale.toStringAsFixed(1));
+    final persist = await _storageService.readRaw('persist_zoom');
+    if (persist != 'false') {
+      await _storageService.writeRaw('text_scale', _textScale.toStringAsFixed(1));
+    }
   }
 
   Future<void> _initialize() async {
