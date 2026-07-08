@@ -5,7 +5,22 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
-## [0.21.0] - 2026-07-05
+## [0.22.0] - 2026-07-08
+
+### Adicionado
+- **web_search_service.dart**: Busca na internet via Brave Search API (até 5 resultados, timeout 10s).
+- **chat_controller.dart**: Fallback web automático quando FTS5 retorna 0 chunks + toggle ligado + motor Claude.
+- **chat_controller.dart**: Contexto web injetado no prompt com título, URL e snippet de cada resultado.
+- **anthropic_service.dart**: Instrução #7 no prompt: "cite URL fonte do CONTEXTO WEB".
+- **settings_screen.dart**: Campo Brave Search API key (Keychain) + instruções.
+- **migrations.dart**: Migration v9 — coluna `web_search_fallback` em collections (default 0).
+
+### Comportamento
+- RAG vazio + motor Claude + toggle ligado + Brave key → busca web automática.
+- Qwen local: nunca aciona web search.
+- Toggle desligado por default (opt-in por coleção).
+
+## [0.21.0] - 2026-07-08
 
 ### Adicionado
 - **app_colors.dart**: Paleta light completa (background, surface, text, divider).
@@ -14,6 +29,10 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - **app.dart**: MaterialApp com `theme` + `darkTheme` + `themeMode` reativo via ThemeNotifier.
 - **secure_storage_service.dart**: Métodos `readRaw`/`writeRaw` para acesso genérico ao Keychain.
 - **settings_screen.dart**: Seção "Aparência" com RadioListTile — Claro / Escuro / Sistema.
+- **chat_screen.dart**: Controles de zoom de texto (+/-) na toolbar (50%→200%) com MediaQuery.textScaler.
+- **chat_screen.dart**: Zoom de texto persiste entre sessões via Keychain.
+- **chat_screen.dart**: Sidebar com AnimatedContainer — transição suave de 200ms ao retrair/expandir.
+- **settings_screen.dart**: Toggle "Lembrar zoom entre sessões" — salva/reseta zoom.
 
 ### Alterado
 - **chat_input.dart**: Layout redesenhado inspirado no Claude Desktop — seletor de modelo dentro do input, mic ao lado do send, botão send com fundo laranja arredondado, disclaimer abaixo.
@@ -23,6 +42,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 ### Corrigido
 - **chat_screen.dart**: ~40 refs AppColors migradas para Theme.of(context) (background, surface, divider, text).
 - **sidebar.dart**: Surface, divider, text colors dinâmicos. surfaceContainerLow em light para separação visual.
+- **sidebar.dart**: Removido `width: 260` fixo — AnimatedContainer controla largura. Evita RenderFlex overflow.
 - **message_bubble.dart**: Bolha assistant, code block, action buttons usam cores do tema.
 - **citation_strip.dart**: Fundo e chips de citação usam surfaceContainerHighest + dividerColor do tema.
 - **app_text_styles.dart**: Removidas cores hardcoded dos TextStyles — agora herdam do Theme.
