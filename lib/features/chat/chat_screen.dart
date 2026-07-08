@@ -70,7 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _lastFailedQuestion;
   bool _showScrollToBottom = false;
   bool _isDragOver = false;
-  double _textScale = 1.0; // Zoom de texto: 0.8 → 1.5
+  double _textScale = 1.0; // Zoom de texto: 0.5 → 2.0
 
   @override
   void initState() {
@@ -1045,7 +1045,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             tooltip: 'Diminuir fonte',
             onPressed: () => setState(() =>
-                _textScale = (_textScale - 0.1).clamp(0.7, 1.6)),
+                _textScale = (_textScale - 0.1).clamp(0.5, 2.0)),
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             padding: EdgeInsets.zero,
           ),
@@ -1060,7 +1060,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             tooltip: 'Aumentar fonte',
             onPressed: () => setState(() =>
-                _textScale = (_textScale + 0.1).clamp(0.7, 1.6)),
+                _textScale = (_textScale + 0.1).clamp(0.5, 2.0)),
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             padding: EdgeInsets.zero,
           ),
