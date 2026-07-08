@@ -70,6 +70,7 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _lastFailedQuestion;
   bool _showScrollToBottom = false;
   bool _isDragOver = false;
+  double _textScale = 1.0; // Zoom de texto: 0.8 → 1.5
 
   @override
   void initState() {
@@ -896,7 +897,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 // Mensagens
                 Expanded(
-                  child: _activeConversationId == null
+                  child: MediaQuery(
+                    data: MediaQuery.of(context).copyWith(
+                      textScaler: TextScaler.linear(_textScale),
+                    ),
+                    child: _activeConversationId == null
                       ? _buildEmptyState()
                       : Stack(
                           children: [
@@ -918,6 +923,7 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                           ],
                         ),
+                  ),
                 ),
 
                 // Input
@@ -1033,6 +1039,32 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           const Spacer(),
+          // Zoom controls
+          IconButton(
+            icon: Icon(Icons.remove, size: 18,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+            tooltip: 'Diminuir fonte',
+            onPressed: () => setState(() =>
+                _textScale = (_textScale - 0.1).clamp(0.7, 1.6)),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.zero,
+          ),
+          Text(
+            '${(_textScale * 100).round()}%',
+            style: AppTextStyles.techSmall.copyWith(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.add, size: 18,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+            tooltip: 'Aumentar fonte',
+            onPressed: () => setState(() =>
+                _textScale = (_textScale + 0.1).clamp(0.7, 1.6)),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            padding: EdgeInsets.zero,
+          ),
+          const SizedBox(width: 8),
           IconButton(
             icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
