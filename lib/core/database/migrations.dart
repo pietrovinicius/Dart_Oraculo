@@ -244,4 +244,21 @@ class Migrations {
     ...allV7,
     createConversationContextAttachments,
   ];
+
+  // --- V9: web_search_fallback em collections ---
+
+  static const String addWebSearchFallbackToCollections = '''
+    ALTER TABLE collections ADD COLUMN web_search_fallback INTEGER NOT NULL DEFAULT 0;
+  ''';
+
+  /// Migrations incrementais v8 → v9.
+  static List<String> get upgradeV8toV9 => [
+    addWebSearchFallbackToCollections,
+  ];
+
+  /// Fresh install completo (v9).
+  static List<String> get allV9 => [
+    ...allV8,
+    addWebSearchFallbackToCollections,
+  ];
 }

@@ -10,6 +10,8 @@ import '../../core/services/fidelity_checker.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
 import '../../core/services/logger_service.dart';
+import '../../core/services/secure_storage_service.dart';
+import '../../core/services/web_search_service.dart';
 import 'models/conversation.dart';
 import 'models/message.dart';
 
@@ -218,11 +220,46 @@ class ChatController extends ChangeNotifier {
           '($totalCharsUsed/$maxChars chars)');
     }
 
+    // 2c. Web search fallback quando RAG não encontra
+    var usedWebSearch = false;
+    if (ftsResults.isEmpty && attachments.isEmpty) {
+      final isClaudeMotor = !activeGenerationService.modelDisplayName.toLowerCase().contains('qwen');
+      if (isClaudeMotor && collectionId != null) {
+        // Verifica toggle da coleção
+        final colRows = await _db.query('collections', where: 'id = ?', whereArgs: [collectionId]);
+        final webEnabled = colRows.isNotEmpty &&
+            (colRows.first['web_search_fallback'] as int?) == 1;
+        if (webEnabled) {
+          final storageService = SecureStorageService();
+          final braveKey = await storageService.readRaw('brave_api_key');
+          if (braveKey != null && braveKey.isNotEmpty) {
+            LoggerService.instance.info(_tag, 'RAG vazio → buscando na web...');
+            final webResults = await WebSearchService(apiKey: braveKey).search(question);
+            if (webResults.isNotEmpty) {
+              usedWebSearch = true;
+              contextBuffer.writeln();
+              contextBuffer.writeln('--- CONTEXTO WEB (pesquisa na internet) ---');
+              for (var i = 0; i < webResults.length; i++) {
+                final r = webResults[i];
+                contextBuffer.writeln('[${i + 1}] ${r.title}');
+                contextBuffer.writeln('    URL: ${r.url}');
+                contextBuffer.writeln('    ${r.snippet}');
+                contextBuffer.writeln();
+              }
+              contextBuffer.writeln('--- FIM CONTEXTO WEB ---');
+              LoggerService.instance.info(_tag,
+                  'Web search: ${webResults.length} resultados injetados');
+            }
+          }
+        }
+      }
+    }
+
     final context = contextBuffer.toString();
     LoggerService.instance.info(_tag,
         'Contexto montado: ${(context.length / 1024).toStringAsFixed(1)}KB '
         '(${ftsResults.length} chunks, truncados: $truncatedCount, '
-        'docs trabalho: ${attachments.length})');
+        'docs trabalho: ${attachments.length}, web: $usedWebSearch)');
 
     // 3. Recupera histórico recente da conversa
     final allMessages = await getMessages(conversationId);
