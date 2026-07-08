@@ -48,7 +48,6 @@ class Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 260,
       color: Theme.of(context).brightness == Brightness.light
           ? Theme.of(context).colorScheme.surfaceContainerLow
           : Theme.of(context).colorScheme.surface,
