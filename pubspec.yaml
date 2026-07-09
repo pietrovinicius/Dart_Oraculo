@@ -1,6 +1,6 @@
 name: dart_oraculo
 description: App pessoal de RAG — oráculo de conhecimento via busca FTS5 e Claude API.
-version: 0.22.0+1
+version: 0.22.1+1
 publish_to: 'none'
 
 environment:

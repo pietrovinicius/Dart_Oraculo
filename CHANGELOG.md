@@ -5,6 +5,11 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.22.1] - 2026-07-09
+
+### Alterado
+- **citation_strip.dart**: Chips de citação substituídos por Container inerte — remove affordance de tap falso (Task 7 do PLANO_FIX_CHAT_RENDERING).
+
 ## [0.22.0] - 2026-07-08
 
 ### Adicionado
@@ -19,6 +24,17 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 - RAG vazio + motor Claude + toggle ligado + Brave key → busca web automática.
 - Qwen local: nunca aciona web search.
 - Toggle desligado por default (opt-in por coleção).
+
+### Alterado
+- **message_bubble.dart**: Único botão "Copiar resposta" posicionado ao lado do dislike no footer. Copia conteúdo completo da resposta. Code blocks individuais mantêm copiar apenas em blocos ≥3 linhas.
+
+### Corrigido
+- **message_bubble.dart**: `blockSpacing: 6` no MarkdownStyleSheet — reduz espaçamento excessivo entre parágrafos.
+- **message_bubble.dart**: Code block margin reduzida de 8px para 4px vertical.
+- **message_bubble.dart**: Newlines triplos (`\n\n\n+`) colapsados para `\n\n` antes do render.
+- **message_bubble.dart**: Ícones like/dislike aumentados de 16px para 20px + cor dinâmica do tema.
+- **message_bubble.dart**: Inline code usa `surfaceContainerHighest` do tema (não mais cor dark hardcoded).
+- **chat_screen.dart**: Citações deduplicadas por (filename + page + sourceType) — não repete "Oracle.pdf (p.1)" 10 vezes.
 
 ## [0.21.0] - 2026-07-08
 

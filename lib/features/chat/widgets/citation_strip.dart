@@ -69,18 +69,20 @@ class CitationStrip extends StatelessWidget {
           : citation.filename;
     }
 
-    return Chip(
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      backgroundColor: citation.sourceType == 'promoted_answer'
-          ? AppColors.accentOrange.withValues(alpha: 0.1)
-          : Theme.of(context).colorScheme.surface,
-      side: BorderSide(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
         color: citation.sourceType == 'promoted_answer'
-            ? AppColors.accentOrange.withValues(alpha: 0.4)
-            : Theme.of(context).dividerColor,
+            ? AppColors.accentOrange.withValues(alpha: 0.1)
+            : Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: citation.sourceType == 'promoted_answer'
+              ? AppColors.accentOrange.withValues(alpha: 0.4)
+              : Theme.of(context).dividerColor,
+        ),
       ),
-      label: Text(label, style: AppTextStyles.techSmall),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(label, style: AppTextStyles.techSmall),
     );
   }
 }
