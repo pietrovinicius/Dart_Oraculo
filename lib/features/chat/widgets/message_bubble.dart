@@ -146,8 +146,7 @@ class MessageBubble extends StatelessWidget {
                       tooltip: 'Editar',
                       onTap: () => onEdit!(content),
                     ),
-                  // Copiar removido do footer — cada code block tem seu próprio botão
-                  // Feedback
+                  // Feedback + Copiar (assistant only)
                   if (!isUser && onFeedbackChanged != null) ...[
                     const SizedBox(width: 4),
                     if (isVerifying)
@@ -176,6 +175,20 @@ class MessageBubble extends StatelessWidget {
                       onTap: () => onFeedbackChanged!(
                         feedback == 'dislike' ? null : 'dislike',
                       ),
+                    ),
+                    const SizedBox(width: 4),
+                    _ActionButton(
+                      icon: Icons.copy_outlined,
+                      tooltip: 'Copiar resposta',
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: content));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Resposta copiada'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ],
