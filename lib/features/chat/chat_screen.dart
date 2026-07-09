@@ -216,6 +216,87 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _showCollectionSettings() async {
+    if (_activeCollectionId == null) return;
+    final db = _chatController?.database;
+    if (db == null) return;
+
+    final rows = await db.query('collections', where: 'id = ?', whereArgs: [_activeCollectionId]);
+    if (rows.isEmpty) return;
+
+    bool webSearch = (rows.first['web_search_fallback'] as int?) == 1;
+    bool verifyFidelity = (rows.first['verify_before_promote'] as int?) == 1;
+    bool generalKnowledge = (rows.first['general_knowledge_fallback'] as int?) == 1;
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          title: Text(
+            'Configurações — ${_activeCollection?.name ?? ""}',
+            style: AppTextStyles.bodyLarge,
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('Conhecimento geral', style: AppTextStyles.bodyMedium),
+                subtitle: const Text(
+                  'Responder com conhecimento do modelo quando RAG não encontrar contexto',
+                  style: AppTextStyles.bodySmall,
+                ),
+                value: generalKnowledge,
+                activeColor: AppColors.accentOrange,
+                onChanged: (v) async {
+                  setDialogState(() => generalKnowledge = v);
+                  await db.update('collections', {'general_knowledge_fallback': v ? 1 : 0},
+                      where: 'id = ?', whereArgs: [_activeCollectionId]);
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Busca na web', style: AppTextStyles.bodyMedium),
+                subtitle: const Text(
+                  'Buscar na internet quando RAG não encontrar contexto',
+                  style: AppTextStyles.bodySmall,
+                ),
+                value: webSearch,
+                activeColor: AppColors.accentOrange,
+                onChanged: (v) async {
+                  setDialogState(() => webSearch = v);
+                  await db.update('collections', {'web_search_fallback': v ? 1 : 0},
+                      where: 'id = ?', whereArgs: [_activeCollectionId]);
+                },
+              ),
+              SwitchListTile(
+                title: const Text('Verificar fidelidade', style: AppTextStyles.bodyMedium),
+                subtitle: const Text(
+                  'Checar se resposta é fiel aos documentos antes de promover',
+                  style: AppTextStyles.bodySmall,
+                ),
+                value: verifyFidelity,
+                activeColor: AppColors.accentOrange,
+                onChanged: (v) async {
+                  setDialogState(() => verifyFidelity = v);
+                  await db.update('collections', {'verify_before_promote': v ? 1 : 0},
+                      where: 'id = ?', whereArgs: [_activeCollectionId]);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fechar', style: TextStyle(color: AppColors.accentOrange)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _refreshConversations() async {
     final convs = await _chatController?.listConversations() ?? [];
     // Filtra por coleção ativa
@@ -903,6 +984,7 @@ class _ChatScreenState extends State<ChatScreen> {
               documentCount: _documentCount,
               onOpenDocuments: _importDocument,
               onOpenLibrary: _openLibrary,
+              onCollectionSettings: _showCollectionSettings,
               appVersion: _appVersion,
             ) : const SizedBox.shrink(),
           ),
@@ -1316,7 +1398,10 @@ class _ChatScreenState extends State<ChatScreen> {
               imagePath: message.imagePath,
             ),
             if (!isUser && message.id != null)
-              CitationStrip(citations: _parseCitations(message)),
+              CitationStrip(
+                citations: _parseCitations(message),
+                responseSource: message.responseSource,
+              ),
           ],
         );
       },
@@ -1434,18 +1519,20 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final result = await _chatController?.setFeedback(messageId, value);
 
-      // Se checagem de fidelidade pede confirmação
+      // Se checagem de fidelidade ou conhecimento geral pede confirmação
       if (result != null && result.needsConfirmation && mounted) {
+        final dialogMessage = result.confirmationMessage ??
+            'Esta resposta contém afirmações que não foram encontradas '
+            'nos documentos consultados. Deseja promovê-la mesmo assim?';
         final confirmed = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             backgroundColor: Theme.of(context).colorScheme.surface,
-            title: const Text('Verificação de fundamentação',
+            title: const Text('Confirmação de promoção',
                 style: AppTextStyles.bodyLarge),
-            content: const Text(
-              'Esta resposta contém afirmações que não foram encontradas '
-              'nos documentos consultados. Deseja promovê-la mesmo assim?',
+            content: Text(
+              dialogMessage,
               style: AppTextStyles.bodyMedium,
             ),
             actions: [
@@ -1458,7 +1545,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accentOrange,
                 ),
-                child: const Text('Promover assim mesmo'),
+                child: const Text('Promover'),
               ),
             ],
           ),

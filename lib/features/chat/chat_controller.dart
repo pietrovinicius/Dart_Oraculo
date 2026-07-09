@@ -20,10 +20,13 @@ class FeedbackResult {
   const FeedbackResult({
     this.needsConfirmation = false,
     this.ungroundedClaims,
+    this.confirmationMessage,
   });
 
   final bool needsConfirmation;
   final List<String>? ungroundedClaims;
+  /// Mensagem exibida no dialog de confirmação (ex: resposta de conhecimento geral).
+  final String? confirmationMessage;
 }
 
 /// Controller principal do chat.
@@ -41,6 +44,9 @@ class ChatController extends ChangeNotifier {
   final Database _db;
   final AnthropicService _anthropicService;
   final FtsService _ftsService;
+
+  /// Acesso ao banco para configurações de coleção na UI.
+  Database get database => _db;
 
   /// Exposto para que o chat_screen possa setá-lo como activeGenerationService.
   AnthropicService get anthropicService => _anthropicService;
@@ -220,36 +226,41 @@ class ChatController extends ChangeNotifier {
           '($totalCharsUsed/$maxChars chars)');
     }
 
-    // 2c. Web search fallback quando RAG não encontra
+    // 2c. Lê toggles da coleção
+    bool allowGeneralKnowledge = false;
+    bool webEnabled = false;
+    if (collectionId != null) {
+      final colRows = await _db.query('collections', where: 'id = ?', whereArgs: [collectionId]);
+      if (colRows.isNotEmpty) {
+        allowGeneralKnowledge = (colRows.first['general_knowledge_fallback'] as int?) == 1;
+        webEnabled = (colRows.first['web_search_fallback'] as int?) == 1;
+      }
+    }
+
+    // 2d. Web search fallback quando RAG não encontra
     var usedWebSearch = false;
     if (ftsResults.isEmpty && attachments.isEmpty) {
       final isClaudeMotor = !activeGenerationService.modelDisplayName.toLowerCase().contains('qwen');
-      if (isClaudeMotor && collectionId != null) {
-        // Verifica toggle da coleção
-        final colRows = await _db.query('collections', where: 'id = ?', whereArgs: [collectionId]);
-        final webEnabled = colRows.isNotEmpty &&
-            (colRows.first['web_search_fallback'] as int?) == 1;
-        if (webEnabled) {
-          final storageService = SecureStorageService();
-          final braveKey = await storageService.readRaw('brave_api_key');
-          if (braveKey != null && braveKey.isNotEmpty) {
-            LoggerService.instance.info(_tag, 'RAG vazio → buscando na web...');
-            final webResults = await WebSearchService(apiKey: braveKey).search(question);
-            if (webResults.isNotEmpty) {
-              usedWebSearch = true;
+      if (isClaudeMotor && webEnabled) {
+        final storageService = SecureStorageService();
+        final braveKey = await storageService.readRaw('brave_api_key');
+        if (braveKey != null && braveKey.isNotEmpty) {
+          LoggerService.instance.info(_tag, 'RAG vazio → buscando na web...');
+          final webResults = await WebSearchService(apiKey: braveKey).search(question);
+          if (webResults.isNotEmpty) {
+            usedWebSearch = true;
+            contextBuffer.writeln();
+            contextBuffer.writeln('--- CONTEXTO WEB (pesquisa na internet) ---');
+            for (var i = 0; i < webResults.length; i++) {
+              final r = webResults[i];
+              contextBuffer.writeln('[${i + 1}] ${r.title}');
+              contextBuffer.writeln('    URL: ${r.url}');
+              contextBuffer.writeln('    ${r.snippet}');
               contextBuffer.writeln();
-              contextBuffer.writeln('--- CONTEXTO WEB (pesquisa na internet) ---');
-              for (var i = 0; i < webResults.length; i++) {
-                final r = webResults[i];
-                contextBuffer.writeln('[${i + 1}] ${r.title}');
-                contextBuffer.writeln('    URL: ${r.url}');
-                contextBuffer.writeln('    ${r.snippet}');
-                contextBuffer.writeln();
-              }
-              contextBuffer.writeln('--- FIM CONTEXTO WEB ---');
-              LoggerService.instance.info(_tag,
-                  'Web search: ${webResults.length} resultados injetados');
             }
+            contextBuffer.writeln('--- FIM CONTEXTO WEB ---');
+            LoggerService.instance.info(_tag,
+                'Web search: ${webResults.length} resultados injetados');
           }
         }
       }
@@ -293,6 +304,7 @@ class ChatController extends ChangeNotifier {
       history: history,
       question: question,
       images: image != null ? [image] : null,
+      allowGeneralKnowledge: allowGeneralKnowledge,
     )) {
       responseBuffer.write(token);
       yield token;
@@ -300,12 +312,23 @@ class ChatController extends ChangeNotifier {
 
     // 6. Persiste resposta do assistant com nome do modelo que gerou
     final chunkIds = ftsResults.map((r) => r.chunkId).toList();
+    // Determina response_source: 'web' se usou web search, 'general' se RAG vazio
+    // e knowledge fallback ligado, 'rag' caso contrário.
+    final String responseSource;
+    if (usedWebSearch) {
+      responseSource = 'web';
+    } else if (chunkIds.isEmpty && allowGeneralKnowledge) {
+      responseSource = 'general';
+    } else {
+      responseSource = 'rag';
+    }
     await _db.insert('messages', {
       'conversation_id': conversationId,
       'role': 'assistant',
       'content': responseBuffer.toString(),
       'model_used': activeGenerationService.modelDisplayName,
       'chunks_used': jsonEncode(chunkIds),
+      'response_source': responseSource,
       'created_at': DateTime.now().toIso8601String(),
     });
 
@@ -445,14 +468,33 @@ class ChatController extends ChangeNotifier {
 
     // Monta contexto dos chunks usados
     final chunksUsed = msgRows.first['chunks_used'] as String?;
-    if (chunksUsed == null || chunksUsed.isEmpty) {
-      // Sem chunks → não tem o que verificar, promove direto
+    final responseSource = msgRows.first['response_source'] as String?;
+
+    // Resposta de conhecimento geral → exige confirmação antes de promover
+    if (responseSource == 'general' || chunksUsed == null || chunksUsed.isEmpty || chunksUsed == '[]') {
+      if (responseSource == 'general') {
+        return const FeedbackResult(
+          needsConfirmation: true,
+          confirmationMessage: 'Esta resposta não veio dos seus documentos. '
+              'Promover pode inserir informação não verificada na sua base. '
+              'Continuar?',
+        );
+      }
+      // Sem chunks e não é general → promove direto (compatibilidade)
       await _promoteAnswer(messageId);
       return const FeedbackResult();
     }
 
     final chunkIds = (jsonDecode(chunksUsed) as List).cast<int>();
     if (chunkIds.isEmpty) {
+      if (responseSource == 'general') {
+        return const FeedbackResult(
+          needsConfirmation: true,
+          confirmationMessage: 'Esta resposta não veio dos seus documentos. '
+              'Promover pode inserir informação não verificada na sua base. '
+              'Continuar?',
+        );
+      }
       await _promoteAnswer(messageId);
       return const FeedbackResult();
     }

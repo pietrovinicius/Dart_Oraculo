@@ -5,11 +5,13 @@ import '../models/image_attachment.dart';
 abstract class GenerationService {
   /// Envia mensagem e retorna stream de tokens da resposta.
   /// [images] — lista opcional de imagens anexadas à pergunta.
+  /// [allowGeneralKnowledge] — quando true, prompt permite fallback de conhecimento geral.
   Stream<String> streamResponse({
     required String systemPrompt,
     required List<Map<String, String>> history,
     required String question,
     List<ImageAttachment>? images,
+    bool allowGeneralKnowledge = false,
   });
 
   /// Identificador do modelo para exibição na UI.

@@ -8,6 +8,7 @@ class Message {
     this.modelUsed,
     this.chunksUsed,
     this.imagePath,
+    this.responseSource,
     required this.createdAt,
   });
 
@@ -18,6 +19,8 @@ class Message {
   final String? modelUsed;
   final String? chunksUsed; // JSON array de chunk IDs
   final String? imagePath; // caminho local da imagem anexada
+  /// Origem da resposta: 'rag' | 'general' | 'web'
+  final String? responseSource;
   final DateTime createdAt;
 
   Map<String, dynamic> toMap() {
@@ -29,6 +32,7 @@ class Message {
       'model_used': modelUsed,
       'chunks_used': chunksUsed,
       'image_path': imagePath,
+      'response_source': responseSource,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -41,6 +45,7 @@ class Message {
     modelUsed: map['model_used'] as String?,
     chunksUsed: map['chunks_used'] as String?,
     imagePath: map['image_path'] as String?,
+    responseSource: map['response_source'] as String?,
     createdAt: DateTime.parse(map['created_at'] as String),
   );
 }

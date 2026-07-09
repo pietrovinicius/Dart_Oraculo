@@ -25,6 +25,7 @@ class Sidebar extends StatelessWidget {
     required this.documentCount,
     required this.onOpenDocuments,
     required this.onOpenLibrary,
+    this.onCollectionSettings,
     this.appVersion = '',
   });
 
@@ -43,6 +44,7 @@ class Sidebar extends StatelessWidget {
   final int documentCount;
   final VoidCallback onOpenDocuments;
   final VoidCallback onOpenLibrary;
+  final VoidCallback? onCollectionSettings;
   final String appVersion;
 
   @override
@@ -245,6 +247,12 @@ class Sidebar extends StatelessWidget {
               },
             ),
           ),
+          if (onCollectionSettings != null)
+            IconButton(
+              icon: Icon(Icons.settings_outlined, size: 18, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+              onPressed: onCollectionSettings,
+              tooltip: 'Configurações da coleção',
+            ),
           IconButton(
             icon: const Icon(Icons.add_box_outlined, size: 18, color: AppColors.accentOrange),
             onPressed: onNewCollection,

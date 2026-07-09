@@ -261,4 +261,27 @@ class Migrations {
     ...allV8,
     addWebSearchFallbackToCollections,
   ];
+
+  // --- V10: general_knowledge_fallback + response_source ---
+
+  static const String addGeneralKnowledgeFallbackToCollections = '''
+    ALTER TABLE collections ADD COLUMN general_knowledge_fallback INTEGER NOT NULL DEFAULT 0;
+  ''';
+
+  static const String addResponseSourceToMessages = '''
+    ALTER TABLE messages ADD COLUMN response_source TEXT;
+  ''';
+
+  /// Migrations incrementais v9 → v10.
+  static List<String> get upgradeV9toV10 => [
+    addGeneralKnowledgeFallbackToCollections,
+    addResponseSourceToMessages,
+  ];
+
+  /// Fresh install completo (v10).
+  static List<String> get allV10 => [
+    ...allV9,
+    addGeneralKnowledgeFallbackToCollections,
+    addResponseSourceToMessages,
+  ];
 }

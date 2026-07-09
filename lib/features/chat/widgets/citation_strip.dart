@@ -23,12 +23,43 @@ class CitationData {
 /// Faixa de citação exibida abaixo de cada resposta do assistant.
 /// Mostra documentos e trechos consultados.
 class CitationStrip extends StatelessWidget {
-  const CitationStrip({super.key, required this.citations});
+  const CitationStrip({
+    super.key,
+    required this.citations,
+    this.responseSource,
+  });
 
   final List<CitationData> citations;
+  /// Origem da resposta: 'rag' | 'general' | 'web'
+  final String? responseSource;
 
   @override
   Widget build(BuildContext context) {
+    // Indicador de conhecimento geral quando sem citações
+    if (responseSource == 'general' && citations.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome_outlined, size: 16, color: AppColors.textMuted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Resposta baseada no conhecimento geral do modelo — sem fonte nos seus documentos',
+                style: AppTextStyles.techSmall.copyWith(color: AppColors.textMuted),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (citations.isEmpty) return const SizedBox.shrink();
 
     return Container(

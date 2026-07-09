@@ -86,6 +86,7 @@ class OllamaService implements GenerationService {
     required List<Map<String, String>> history,
     required String question,
     List<ImageAttachment>? images,
+    bool allowGeneralKnowledge = false,
   }) async* {
     LoggerService.instance.info(_tag, 'streamResponse(model=$model)');
 
