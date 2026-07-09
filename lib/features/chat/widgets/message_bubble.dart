@@ -285,14 +285,23 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
       return null; // flutter_markdown renderiza com estilo `code` do StyleSheet
     }
 
-    return _CodeBlockWidget(code: code, language: language);
+    // Code blocks curtos (< 3 linhas) sem linguagem → sem botão Copiar
+    final lineCount = '\n'.allMatches(code).length + 1;
+    final showCopyButton = lineCount >= 3 || language != null;
+
+    return _CodeBlockWidget(
+      code: code,
+      language: language,
+      showCopy: showCopyButton,
+    );
   }
 }
 
 class _CodeBlockWidget extends StatefulWidget {
-  const _CodeBlockWidget({required this.code, this.language});
+  const _CodeBlockWidget({required this.code, this.language, this.showCopy = true});
   final String code;
   final String? language;
+  final bool showCopy;
 
   @override
   State<_CodeBlockWidget> createState() => _CodeBlockWidgetState();
@@ -320,7 +329,8 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header com botão copy
+          // Header com botão copy (só se showCopy)
+          if (widget.showCopy)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
