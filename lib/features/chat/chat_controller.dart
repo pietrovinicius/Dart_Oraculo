@@ -10,8 +10,8 @@ import '../../core/services/fidelity_checker.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
 import '../../core/services/logger_service.dart';
-import '../../core/services/secure_storage_service.dart';
-import '../../core/services/web_search_service.dart';
+// import '../../core/services/secure_storage_service.dart'; // WEB_SEARCH_DISABLED
+// import '../../core/services/web_search_service.dart'; // WEB_SEARCH_DISABLED
 import 'models/conversation.dart';
 import 'models/message.dart';
 
@@ -228,43 +228,45 @@ class ChatController extends ChangeNotifier {
 
     // 2c. Lê toggles da coleção
     bool allowGeneralKnowledge = false;
-    bool webEnabled = false;
+    // bool webEnabled = false; // WEB_SEARCH_DISABLED
     if (collectionId != null) {
       final colRows = await _db.query('collections', where: 'id = ?', whereArgs: [collectionId]);
       if (colRows.isNotEmpty) {
         allowGeneralKnowledge = (colRows.first['general_knowledge_fallback'] as int?) == 1;
-        webEnabled = (colRows.first['web_search_fallback'] as int?) == 1;
+        // webEnabled = (colRows.first['web_search_fallback'] as int?) == 1; // WEB_SEARCH_DISABLED
       }
     }
 
-    // 2d. Web search fallback quando RAG não encontra
-    var usedWebSearch = false;
-    if (ftsResults.isEmpty && attachments.isEmpty) {
-      final isClaudeMotor = !activeGenerationService.modelDisplayName.toLowerCase().contains('qwen');
-      if (isClaudeMotor && webEnabled) {
-        final storageService = SecureStorageService();
-        final braveKey = await storageService.readRaw('brave_api_key');
-        if (braveKey != null && braveKey.isNotEmpty) {
-          LoggerService.instance.info(_tag, 'RAG vazio → buscando na web...');
-          final webResults = await WebSearchService(apiKey: braveKey).search(question);
-          if (webResults.isNotEmpty) {
-            usedWebSearch = true;
-            contextBuffer.writeln();
-            contextBuffer.writeln('--- CONTEXTO WEB (pesquisa na internet) ---');
-            for (var i = 0; i < webResults.length; i++) {
-              final r = webResults[i];
-              contextBuffer.writeln('[${i + 1}] ${r.title}');
-              contextBuffer.writeln('    URL: ${r.url}');
-              contextBuffer.writeln('    ${r.snippet}');
-              contextBuffer.writeln();
-            }
-            contextBuffer.writeln('--- FIM CONTEXTO WEB ---');
-            LoggerService.instance.info(_tag,
-                'Web search: ${webResults.length} resultados injetados');
-          }
-        }
-      }
-    }
+    // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
+    // var usedWebSearch = false;
+    // if (ftsResults.isEmpty && attachments.isEmpty) {
+    //   final isClaudeMotor = !activeGenerationService.modelDisplayName.toLowerCase().contains('qwen');
+    //   if (isClaudeMotor && webEnabled) {
+    //     final storageService = SecureStorageService();
+    //     final braveKey = await storageService.readRaw('brave_api_key');
+    //     if (braveKey != null && braveKey.isNotEmpty) {
+    //       LoggerService.instance.info(_tag, 'RAG vazio → buscando na web...');
+    //       final webResults = await WebSearchService(apiKey: braveKey).search(question);
+    //       if (webResults.isNotEmpty) {
+    //         usedWebSearch = true;
+    //         contextBuffer.writeln();
+    //         contextBuffer.writeln('--- CONTEXTO WEB (pesquisa na internet) ---');
+    //         for (var i = 0; i < webResults.length; i++) {
+    //           final r = webResults[i];
+    //           contextBuffer.writeln('[${i + 1}] ${r.title}');
+    //           contextBuffer.writeln('    URL: ${r.url}');
+    //           contextBuffer.writeln('    ${r.snippet}');
+    //           contextBuffer.writeln();
+    //         }
+    //         contextBuffer.writeln('--- FIM CONTEXTO WEB ---');
+    //         LoggerService.instance.info(_tag,
+    //             'Web search: ${webResults.length} resultados injetados');
+    //       }
+    //     }
+    //   }
+    // }
+    // --- FIM WEB_SEARCH_DISABLED ---
+    const usedWebSearch = false; // placeholder para lógica de response_source
 
     final context = contextBuffer.toString();
     LoggerService.instance.info(_tag,

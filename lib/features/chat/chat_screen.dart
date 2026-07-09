@@ -224,7 +224,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final rows = await db.query('collections', where: 'id = ?', whereArgs: [_activeCollectionId]);
     if (rows.isEmpty) return;
 
-    bool webSearch = (rows.first['web_search_fallback'] as int?) == 1;
+    // bool webSearch = (rows.first['web_search_fallback'] as int?) == 1; // WEB_SEARCH_DISABLED
     bool verifyFidelity = (rows.first['verify_before_promote'] as int?) == 1;
     bool generalKnowledge = (rows.first['general_knowledge_fallback'] as int?) == 1;
 
@@ -256,20 +256,21 @@ class _ChatScreenState extends State<ChatScreen> {
                       where: 'id = ?', whereArgs: [_activeCollectionId]);
                 },
               ),
-              SwitchListTile(
-                title: const Text('Busca na web', style: AppTextStyles.bodyMedium),
-                subtitle: const Text(
-                  'Buscar na internet quando RAG não encontrar contexto',
-                  style: AppTextStyles.bodySmall,
-                ),
-                value: webSearch,
-                activeColor: AppColors.accentOrange,
-                onChanged: (v) async {
-                  setDialogState(() => webSearch = v);
-                  await db.update('collections', {'web_search_fallback': v ? 1 : 0},
-                      where: 'id = ?', whereArgs: [_activeCollectionId]);
-                },
-              ),
+              // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
+              // SwitchListTile(
+              //   title: const Text('Busca na web', style: AppTextStyles.bodyMedium),
+              //   subtitle: const Text(
+              //     'Buscar na internet quando RAG não encontrar contexto',
+              //     style: AppTextStyles.bodySmall,
+              //   ),
+              //   value: webSearch,
+              //   activeColor: AppColors.accentOrange,
+              //   onChanged: (v) async {
+              //     setDialogState(() => webSearch = v);
+              //     await db.update('collections', {'web_search_fallback': v ? 1 : 0},
+              //         where: 'id = ?', whereArgs: [_activeCollectionId]);
+              //   },
+              // ),
               SwitchListTile(
                 title: const Text('Verificar fidelidade', style: AppTextStyles.bodyMedium),
                 subtitle: const Text(

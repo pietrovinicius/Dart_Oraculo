@@ -21,9 +21,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late final SettingsController _controller;
   final _apiKeyController = TextEditingController();
-  final _braveKeyController = TextEditingController();
+  // final _braveKeyController = TextEditingController(); // WEB_SEARCH_DISABLED
   bool _obscureKey = true;
-  bool _obscureBraveKey = true;
+  // bool _obscureBraveKey = true; // WEB_SEARCH_DISABLED
   bool _persistZoom = true;
 
   @override
@@ -35,7 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _controller.addListener(_onControllerChanged);
     _controller.load();
     _loadZoomPref();
-    _loadBraveKey();
+    // _loadBraveKey(); // WEB_SEARCH_DISABLED
   }
 
   void _onControllerChanged() {
@@ -82,8 +82,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _buildApiKeySection(),
                   const SizedBox(height: 32),
-                  _buildBraveKeySection(),
-                  const SizedBox(height: 32),
+                  // _buildBraveKeySection(), // WEB_SEARCH_DISABLED
+                  // const SizedBox(height: 32), // WEB_SEARCH_DISABLED
                   _buildModelSection(),
                   const SizedBox(height: 32),
                   _buildThemeSection(),
@@ -334,70 +334,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _loadBraveKey() async {
-    final key = await _storage.readRaw('brave_api_key');
-    if (key != null && key.isNotEmpty && mounted) {
-      _braveKeyController.text = '•' * 20;
-    }
-  }
-
-  Widget _buildBraveKeySection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Busca na Internet', style: AppTextStyles.bodyLarge),
-        const SizedBox(height: 4),
-        Text(
-          'Usado quando documentos locais não contêm a resposta.',
-          style: AppTextStyles.bodySmall.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _braveKeyController,
-                obscureText: _obscureBraveKey,
-                style: AppTextStyles.techMedium,
-                decoration: InputDecoration(
-                  hintText: 'Brave Search API key',
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(_obscureBraveKey
-                            ? Icons.visibility_off
-                            : Icons.visibility),
-                        onPressed: () => setState(
-                            () => _obscureBraveKey = !_obscureBraveKey),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.save, color: AppColors.accentOrange),
-                        onPressed: () async {
-                          final key = _braveKeyController.text.trim();
-                          if (key.isEmpty || key.startsWith('•')) return;
-                          await _storage.writeRaw('brave_api_key', key);
-                          if (mounted) {
-                            _braveKeyController.text = '•' * 20;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Brave API key salva'),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
+  // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
+  // Future<void> _loadBraveKey() async {
+  //   final key = await _storage.readRaw('brave_api_key');
+  //   if (key != null && key.isNotEmpty && mounted) {
+  //     _braveKeyController.text = '•' * 20;
+  //   }
+  // }
+  //
+  // Widget _buildBraveKeySection() {
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       const Text('Busca na Internet', style: AppTextStyles.bodyLarge),
+  //       const SizedBox(height: 4),
+  //       Text(
+  //         'Usado quando documentos locais não contêm a resposta.',
+  //         style: AppTextStyles.bodySmall.copyWith(
+  //           color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+  //         ),
+  //       ),
+  //       const SizedBox(height: 12),
+  //       Row(
+  //         children: [
+  //           Expanded(
+  //             child: TextField(
+  //               controller: _braveKeyController,
+  //               obscureText: _obscureBraveKey,
+  //               style: AppTextStyles.techMedium,
+  //               decoration: InputDecoration(
+  //                 hintText: 'Brave Search API key',
+  //                 suffixIcon: Row(
+  //                   mainAxisSize: MainAxisSize.min,
+  //                   children: [
+  //                     IconButton(
+  //                       icon: Icon(_obscureBraveKey
+  //                           ? Icons.visibility_off
+  //                           : Icons.visibility),
+  //                       onPressed: () => setState(
+  //                           () => _obscureBraveKey = !_obscureBraveKey),
+  //                     ),
+  //                     IconButton(
+  //                       icon: const Icon(Icons.save, color: AppColors.accentOrange),
+  //                       onPressed: () async {
+  //                         final key = _braveKeyController.text.trim();
+  //                         if (key.isEmpty || key.startsWith('•')) return;
+  //                         await _storage.writeRaw('brave_api_key', key);
+  //                         if (mounted) {
+  //                           _braveKeyController.text = '•' * 20;
+  //                           ScaffoldMessenger.of(context).showSnackBar(
+  //                             const SnackBar(
+  //                               content: Text('Brave API key salva'),
+  //                               backgroundColor: AppColors.success,
+  //                             ),
+  //                           );
+  //                         }
+  //                       },
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ],
+  //   );
+  // }
+  // --- FIM WEB_SEARCH_DISABLED ---
 }
