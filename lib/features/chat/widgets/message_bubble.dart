@@ -269,16 +269,22 @@ class _FeedbackButtonState extends State<_FeedbackButton> {
   }
 }
 
-/// Builder customizado para code blocks com botão de copiar.
+/// Builder customizado para code blocks FENCED com botão de copiar.
+/// Inline code (backtick simples) retorna null → usa estilo default do MarkdownStyleSheet.
 class _CodeBlockBuilder extends MarkdownElementBuilder {
   @override
   Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
     final code = element.textContent;
-    // Extrai linguagem do atributo class (ex: 'language-sql')
     final className = element.attributes['class'] ?? '';
     final language = className.startsWith('language-')
         ? className.substring(9).toUpperCase()
         : null;
+
+    // Inline code: sem class E sem newline → renderiza com estilo default (sem widget custom)
+    if (language == null && !code.contains('\n')) {
+      return null; // flutter_markdown renderiza com estilo `code` do StyleSheet
+    }
+
     return _CodeBlockWidget(code: code, language: language);
   }
 }
