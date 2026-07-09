@@ -77,12 +77,13 @@ class MessageBubble extends StatelessWidget {
               SelectableText(content, style: AppTextStyles.bodyLarge)
             else
               MarkdownBody(
-                data: content,
+                data: content.replaceAll(RegExp(r'\n{3,}'), '\n\n'),
                 selectable: true,
                 builders: {
                   'code': _CodeBlockBuilder(),
                 },
                 styleSheet: MarkdownStyleSheet(
+                  blockSpacing: 6,
                   p: AppTextStyles.bodyLarge,
                   h1: AppTextStyles.displayMedium.copyWith(fontSize: 22),
                   h2: AppTextStyles.bodyLarge.copyWith(
@@ -145,21 +146,7 @@ class MessageBubble extends StatelessWidget {
                       tooltip: 'Editar',
                       onTap: () => onEdit!(content),
                     ),
-                  // Copiar
-                  if (!isUser)
-                    _ActionButton(
-                      icon: Icons.copy_outlined,
-                      tooltip: 'Copiar',
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: content));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Copiado'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                    ),
+                  // Copiar removido do footer — cada code block tem seu próprio botão
                   // Feedback
                   if (!isUser && onFeedbackChanged != null) ...[
                     const SizedBox(width: 4),
@@ -273,8 +260,8 @@ class _FeedbackButtonState extends State<_FeedbackButton> {
           curve: Curves.easeOut,
           child: Icon(
             widget.isActive ? widget.activeIcon : widget.icon,
-            size: 16,
-            color: widget.isActive ? AppColors.accentOrange : AppColors.textMuted,
+            size: 20,
+            color: widget.isActive ? AppColors.accentOrange : Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
           ),
         ),
       ),
@@ -319,7 +306,7 @@ class _CodeBlockWidgetState extends State<_CodeBlockWidget> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(8),

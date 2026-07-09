@@ -852,9 +852,20 @@ class _ChatScreenState extends State<ChatScreen> {
     if (message.chunksUsed == null) return [];
     try {
       final ids = jsonDecode(message.chunksUsed!) as List;
-      return ids
+      final all = ids
           .map((id) => _citationCache[id as int] ?? CitationData(filename: 'doc #$id'))
           .toList();
+      // Deduplicar por filename+page
+      final seen = <String>{};
+      final deduped = <CitationData>[];
+      for (final c in all) {
+        final key = '${c.filename}_${c.page}_${c.sourceType}';
+        if (!seen.contains(key)) {
+          seen.add(key);
+          deduped.add(c);
+        }
+      }
+      return deduped;
     } catch (_) {
       return [];
     }
