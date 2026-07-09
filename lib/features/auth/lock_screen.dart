@@ -19,14 +19,9 @@ class _LockScreenState extends State<LockScreen> {
   String? _errorMessage;
   bool _authenticating = false;
 
-  /// Flag de compilação para bypass de auth em debug.
+  /// Flag de compilação para bypass de auth em testes automatizados.
   /// Usar: flutter run --dart-define=SKIP_AUTH=true
   static const _skipAuth = bool.fromEnvironment('SKIP_AUTH');
-
-  // TODO(auth): Reativar autenticação biométrica no futuro.
-  // Flag para desabilitar auth temporariamente durante desenvolvimento.
-  // Setar para false quando biometria for reativada.
-  static const _authDisabled = true;
 
   @override
   void initState() {
@@ -35,9 +30,7 @@ class _LockScreenState extends State<LockScreen> {
   }
 
   Future<void> _tryAuthenticate() async {
-    // Auth desabilitada temporariamente — navega direto para home
-    // TODO(auth): remover este bloco quando reativar biometria
-    if (_authDisabled || _skipAuth) {
+    if (_skipAuth) {
       _navigateHome();
       return;
     }
@@ -61,9 +54,15 @@ class _LockScreenState extends State<LockScreen> {
       case AuthResult.success:
         _navigateHome();
       case AuthResult.notConfigured:
-        _navigateHome();
+        setState(() {
+          _authenticating = false;
+          _errorMessage = 'Biometria não configurada neste dispositivo. Configure o Touch ID nas preferências do sistema.';
+        });
       case AuthResult.notAvailable:
-        _navigateHome();
+        setState(() {
+          _authenticating = false;
+          _errorMessage = 'Autenticação biométrica não disponível neste dispositivo.';
+        });
       case AuthResult.failed:
         setState(() {
           _authenticating = false;

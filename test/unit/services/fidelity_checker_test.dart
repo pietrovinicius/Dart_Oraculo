@@ -20,7 +20,11 @@ void main() {
       });
 
       final checker = FidelityChecker(
-        apiKey: 'sk-test-123456789',
+        headers: {
+          'x-api-key': 'sk-test-123456789',
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
         httpClient: mockClient,
       );
 
@@ -50,7 +54,11 @@ void main() {
       });
 
       final checker = FidelityChecker(
-        apiKey: 'sk-test-123456789',
+        headers: {
+          'x-api-key': 'sk-test-123456789',
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
         httpClient: mockClient,
       );
 
@@ -70,7 +78,11 @@ void main() {
       });
 
       final checker = FidelityChecker(
-        apiKey: 'sk-test-123456789',
+        headers: {
+          'x-api-key': 'sk-test-123456789',
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
         httpClient: mockClient,
       );
 
@@ -98,7 +110,11 @@ void main() {
       });
 
       final checker = FidelityChecker(
-        apiKey: 'sk-test-123456789',
+        headers: {
+          'x-api-key': 'sk-test-123456789',
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
         httpClient: mockClient,
       );
 

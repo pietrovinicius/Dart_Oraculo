@@ -464,8 +464,7 @@ class ChatController extends ChangeNotifier {
 
     // Chama verificador
     final checker = FidelityChecker(
-      apiKey: _anthropicService.apiKey,
-      httpClient: null,
+      headers: _anthropicService.buildHeaders(),
     );
     final result = await checker.check(
       answerText: msgRows.first['content'] as String,

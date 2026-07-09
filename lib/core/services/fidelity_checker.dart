@@ -17,13 +17,13 @@ class FidelityCheckResult {
 /// Usa motor Anthropic cruzado (Sonnet verifica Opus, vice-versa).
 class FidelityChecker {
   FidelityChecker({
-    required String apiKey,
+    required Map<String, String> headers,
     http.Client? httpClient,
-  })  : _apiKey = apiKey,
+  })  : _headers = headers,
         _httpClient = httpClient ?? http.Client();
 
   static const _tag = 'FidelityChecker';
-  final String _apiKey;
+  final Map<String, String> _headers;
   final http.Client _httpClient;
 
   /// Verifica fidelidade da [answerText] contra [chunksContext].
@@ -71,9 +71,7 @@ class FidelityChecker {
       final response = await _httpClient.post(
         Uri.parse(AppConfig.anthropicBaseUrl),
         headers: {
-          'Content-Type': 'application/json',
-          'X-API-Key': _apiKey,
-          'anthropic-version': AppConfig.anthropicVersion,
+          ..._headers,
           'anthropic-beta': 'prompt-caching-2024-07-31',
         },
         body: body,
