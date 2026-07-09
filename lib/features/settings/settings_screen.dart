@@ -26,6 +26,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // bool _obscureBraveKey = true; // WEB_SEARCH_DISABLED
   bool _persistZoom = true;
   bool _generalKnowledge = false;
+  bool _verifyFidelity = true;
+  double _maxHistoryMessages = 10;
+  double _maxChunksPerQuery = 10;
+  double _chunkMaxTokens = 500;
 
   @override
   void initState() {
@@ -37,6 +41,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _controller.load();
     _loadZoomPref();
     _loadGeneralKnowledge();
+    _loadFidelity();
+    _loadAdvancedSettings();
     // _loadBraveKey(); // WEB_SEARCH_DISABLED
   }
 
@@ -90,11 +96,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   const SizedBox(height: 32),
                   _buildGeneralKnowledgeSection(),
                   const SizedBox(height: 32),
+                  _buildFidelitySection(),
+                  const SizedBox(height: 32),
                   _buildThemeSection(),
                   const SizedBox(height: 32),
                   _buildZoomSection(),
                   const SizedBox(height: 32),
                   _buildBiometricSection(),
+                  const SizedBox(height: 32),
+                  _buildAdvancedSection(),
                 ],
               ),
             ),
@@ -335,6 +345,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _loadFidelity() async {
+    final saved = await _storage.readRaw('verify_before_promote_enabled');
+    if (mounted) {
+      setState(() => _verifyFidelity = saved != 'false');
+    }
+  }
+
+  Widget _buildFidelitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Verificação de fidelidade', style: AppTextStyles.bodyLarge),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          title: const Text(
+            'Checar antes de promover',
+            style: AppTextStyles.bodyMedium,
+          ),
+          subtitle: const Text(
+            'Verifica se a resposta é fiel aos documentos antes de '
+            'promovê-la como conhecimento na base RAG',
+            style: AppTextStyles.bodySmall,
+          ),
+          value: _verifyFidelity,
+          activeColor: AppColors.accentOrange,
+          onChanged: (v) async {
+            setState(() => _verifyFidelity = v);
+            await _storage.writeRaw('verify_before_promote_enabled', v.toString());
+          },
+        ),
+      ],
+    );
+  }
+
   Future<void> _loadZoomPref() async {
     final saved = await _storage.readRaw('persist_zoom');
     if (mounted) {
@@ -440,4 +484,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
   //   );
   // }
   // --- FIM WEB_SEARCH_DISABLED ---
+
+  Future<void> _loadAdvancedSettings() async {
+    final histStr = await _storage.readRaw('max_history_messages');
+    final chunksStr = await _storage.readRaw('max_chunks_per_query');
+    final chunkSizeStr = await _storage.readRaw('chunk_max_tokens');
+    if (mounted) {
+      setState(() {
+        _maxHistoryMessages = double.tryParse(histStr ?? '') ?? 10;
+        _maxChunksPerQuery = double.tryParse(chunksStr ?? '') ?? 10;
+        _chunkMaxTokens = double.tryParse(chunkSizeStr ?? '') ?? 500;
+      });
+    }
+  }
+
+  Widget _buildAdvancedSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Avançado', style: AppTextStyles.bodyLarge),
+        const SizedBox(height: 16),
+        _buildSliderTile(
+          label: 'Mensagens de contexto',
+          subtitle: 'Quantas mensagens anteriores enviar ao modelo (mais = mais contexto, mais tokens)',
+          value: _maxHistoryMessages,
+          min: 5,
+          max: 30,
+          divisions: 5,
+          storageKey: 'max_history_messages',
+          onChanged: (v) => setState(() => _maxHistoryMessages = v),
+        ),
+        const SizedBox(height: 12),
+        _buildSliderTile(
+          label: 'Chunks por busca',
+          subtitle: 'Máximo de trechos recuperados por pergunta (mais = respostas mais completas, mais tokens)',
+          value: _maxChunksPerQuery,
+          min: 3,
+          max: 20,
+          divisions: 17,
+          storageKey: 'max_chunks_per_query',
+          onChanged: (v) => setState(() => _maxChunksPerQuery = v),
+        ),
+        const SizedBox(height: 12),
+        _buildSliderTile(
+          label: 'Tamanho do chunk',
+          subtitle: 'Tokens por trecho na indexação. Afeta apenas novos documentos.',
+          value: _chunkMaxTokens,
+          min: 200,
+          max: 1000,
+          divisions: 16,
+          storageKey: 'chunk_max_tokens',
+          onChanged: (v) => setState(() => _chunkMaxTokens = v),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSliderTile({
+    required String label,
+    required String subtitle,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required String storageKey,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: AppTextStyles.bodyMedium),
+            Text('${value.round()}', style: AppTextStyles.bodyMedium),
+          ],
+        ),
+        Text(subtitle, style: AppTextStyles.bodySmall),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: divisions,
+          activeColor: AppColors.accentOrange,
+          label: '${value.round()}',
+          onChanged: (v) {
+            onChanged(v);
+          },
+          onChangeEnd: (v) async {
+            await _storage.writeRaw(storageKey, '${v.round()}');
+          },
+        ),
+      ],
+    );
+  }
 }

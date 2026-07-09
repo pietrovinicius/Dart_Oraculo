@@ -71,12 +71,24 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showScrollToBottom = false;
   bool _isDragOver = false;
   double _textScale = 1.0; // Zoom de texto: 0.5 → 2.0
+  int _chunkMaxTokens = AppConfig.chunkMaxTokens;
 
   @override
   void initState() {
     super.initState();
     _loadTextScale();
+    _loadChunkMaxTokens();
     _initialize();
+  }
+
+  Future<void> _loadChunkMaxTokens() async {
+    final saved = await _storageService.readRaw('chunk_max_tokens');
+    if (saved != null) {
+      final parsed = int.tryParse(saved);
+      if (parsed != null && mounted) {
+        setState(() => _chunkMaxTokens = parsed);
+      }
+    }
   }
 
   Future<void> _loadTextScale() async {
@@ -129,7 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _documentService = DocumentService(
       database: db,
       pdfService: PdfService(),
-      chunkingService: ChunkingService(),
+      chunkingService: ChunkingService(maxTokensPerChunk: _chunkMaxTokens),
       anthropicService: apiKey != null && apiKey.isNotEmpty
           ? anthropicService
           : null,
@@ -224,16 +236,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final rows = await db.query('collections', where: 'id = ?', whereArgs: [_activeCollectionId]);
     if (rows.isEmpty) return;
 
-    // bool webSearch = (rows.first['web_search_fallback'] as int?) == 1; // WEB_SEARCH_DISABLED
-    bool verifyFidelity = (rows.first['verify_before_promote'] as int?) == 1;
-    // bool generalKnowledge — movido para Settings global
+    // Todos os toggles migrados para Settings global (v0.24.0+)
+    // Dialog de coleção preservado apenas para instruções customizadas.
 
     if (!mounted) return;
 
     await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
+      builder: (ctx) => AlertDialog(
           backgroundColor: Theme.of(context).colorScheme.surface,
           title: Text(
             'Configurações — ${_activeCollection?.name ?? ""}',
@@ -242,35 +252,9 @@ class _ChatScreenState extends State<ChatScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // --- Toggle "Conhecimento geral" movido para Settings (config global) ---
-              // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
-              // SwitchListTile(
-              //   title: const Text('Busca na web', style: AppTextStyles.bodyMedium),
-              //   subtitle: const Text(
-              //     'Buscar na internet quando RAG não encontrar contexto',
-              //     style: AppTextStyles.bodySmall,
-              //   ),
-              //   value: webSearch,
-              //   activeColor: AppColors.accentOrange,
-              //   onChanged: (v) async {
-              //     setDialogState(() => webSearch = v);
-              //     await db.update('collections', {'web_search_fallback': v ? 1 : 0},
-              //         where: 'id = ?', whereArgs: [_activeCollectionId]);
-              //   },
-              // ),
-              SwitchListTile(
-                title: const Text('Verificar fidelidade', style: AppTextStyles.bodyMedium),
-                subtitle: const Text(
-                  'Checar se resposta é fiel aos documentos antes de promover',
-                  style: AppTextStyles.bodySmall,
-                ),
-                value: verifyFidelity,
-                activeColor: AppColors.accentOrange,
-                onChanged: (v) async {
-                  setDialogState(() => verifyFidelity = v);
-                  await db.update('collections', {'verify_before_promote': v ? 1 : 0},
-                      where: 'id = ?', whereArgs: [_activeCollectionId]);
-                },
+              const Text(
+                'Toggles de comportamento foram movidos para Configurações (menu principal).',
+                style: AppTextStyles.bodySmall,
               ),
             ],
           ),
@@ -280,7 +264,6 @@ class _ChatScreenState extends State<ChatScreen> {
               child: const Text('Fechar', style: TextStyle(color: AppColors.accentOrange)),
             ),
           ],
-        ),
       ),
     );
   }

@@ -142,7 +142,9 @@ class ChatController extends ChangeNotifier {
         '(coleção=${collectionId ?? "todas"})');
 
     // 1. Busca chunks relevantes via FTS5 (filtrado por coleção)
-    final ftsResults = await _ftsService.search(question, collectionId: collectionId);
+    final chunksStr = await SecureStorageService().readRaw('max_chunks_per_query');
+    final maxChunks = int.tryParse(chunksStr ?? '') ?? AppConfig.maxChunksPerQuery;
+    final ftsResults = await _ftsService.search(question, collectionId: collectionId, limit: maxChunks);
     LoggerService.instance.info(_tag, 'FTS5 retornou ${ftsResults.length} chunks');
 
     // Log detalhado de cada chunk retornado
@@ -270,9 +272,11 @@ class ChatController extends ChangeNotifier {
         'docs trabalho: ${attachments.length}, web: $usedWebSearch)');
 
     // 3. Recupera histórico recente da conversa
+    final histStr = await SecureStorageService().readRaw('max_history_messages');
+    final maxHistory = int.tryParse(histStr ?? '') ?? AppConfig.maxHistoryMessages;
     final allMessages = await getMessages(conversationId);
-    final recentMessages = allMessages.length > AppConfig.maxHistoryMessages
-        ? allMessages.sublist(allMessages.length - AppConfig.maxHistoryMessages)
+    final recentMessages = allMessages.length > maxHistory
+        ? allMessages.sublist(allMessages.length - maxHistory)
         : allMessages;
     LoggerService.instance.info(_tag,
         'Histórico: ${recentMessages.length} mensagens (de ${allMessages.length} total)');
@@ -433,26 +437,12 @@ class ChatController extends ChangeNotifier {
       return const FeedbackResult();
     }
 
-    // Busca collection_id para verificar toggle
-    final convId = msgRows.first['conversation_id'] as int;
-    final convRows = await _db.query('conversations', where: 'id = ?', whereArgs: [convId]);
-    if (convRows.isEmpty) {
+    // Verifica toggle global de fidelidade (Settings)
+    final verifySetting = await SecureStorageService().readRaw('verify_before_promote_enabled');
+    if (verifySetting == 'false') {
+      LoggerService.instance.info(_tag, 'Skip checagem (toggle desligado em Settings)');
       await _promoteAnswer(messageId);
       return const FeedbackResult();
-    }
-    final collectionId = convRows.first['collection_id'] as int?;
-
-    // Verifica toggle por coleção
-    if (collectionId != null) {
-      final colRows = await _db.query('collections', where: 'id = ?', whereArgs: [collectionId]);
-      if (colRows.isNotEmpty) {
-        final verify = (colRows.first['verify_before_promote'] as int?) ?? 1;
-        if (verify == 0) {
-          LoggerService.instance.info(_tag, 'Skip checagem (toggle desligado na coleção)');
-          await _promoteAnswer(messageId);
-          return const FeedbackResult();
-        }
-      }
     }
 
     // Determina verificador cruzado
