@@ -5,6 +5,83 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.25.0] - 2026-07-09
+
+### Adicionado
+- **settings_screen.dart**: Toggle "Verificar fidelidade" como configuração global (entre Conhecimento geral e Aparência).
+- **settings_screen.dart**: Seção "Avançado" com 3 sliders configuráveis:
+  - Mensagens de contexto (5–30, default 10)
+  - Chunks por busca (3–20, default 10)
+  - Tamanho do chunk (200–1000, default 500)
+- **chat_controller.dart**: `maxHistoryMessages` e `maxChunksPerQuery` lidos de SecureStorage com fallback para AppConfig.
+- **chat_screen.dart**: `chunkMaxTokens` lido de SecureStorage e passado ao ChunkingService na ingestão.
+
+### Alterado
+- **chat_controller.dart**: `_checkAndPromote()` lê toggle de fidelidade de SecureStorage (global) em vez de coluna por coleção.
+- **chat_screen.dart**: Dialog "Configurações da coleção" simplificado — toggles movidos para Settings, dialog apenas informa.
+
+### Comportamento
+- Todas as configurações de comportamento agora são globais em Settings (não mais por coleção).
+- Sliders persistem via Keychain: `max_history_messages`, `max_chunks_per_query`, `chunk_max_tokens`.
+- Toggle fidelidade persiste via `verify_before_promote_enabled` (default: true).
+- Alteração de `chunk_max_tokens` afeta apenas documentos indexados após a mudança.
+
+## [0.24.0] - 2026-07-09
+
+### Alterado
+- **settings_screen.dart**: Toggle "Conhecimento geral" adicionado como configuração global do app (seção entre Modelo e Aparência).
+- **chat_controller.dart**: Lê toggle de conhecimento geral via `SecureStorageService` (config global) em vez de coluna por coleção.
+- **chat_screen.dart**: Toggle de conhecimento geral removido do dialog "Configurações da coleção" — agora é exclusivamente global em Settings.
+
+### Comportamento
+- Toggle OFF (padrão): modelo responde somente com base nos documentos indexados (RAG estrito).
+- Toggle ON: quando RAG não encontra contexto, modelo responde com conhecimento próprio (Opus/Sonnet).
+- Configuração persiste via Keychain (`general_knowledge_enabled`).
+
+## [0.23.1] - 2026-07-09
+
+### Removido
+- **settings_screen.dart**: Seção "Busca na Internet" e campo Brave Search API key removidos da UI.
+- **chat_controller.dart**: Fluxo de web search fallback comentado (marcado WEB_SEARCH_DISABLED).
+- **chat_screen.dart**: Toggle "Busca na web" removido do dialog de configurações da coleção.
+
+### Motivo
+- Busca na internet não é conceito do app. O Dart Oráculo é RAG pessoal local — conhecimento vem exclusivamente dos documentos indexados + conhecimento geral do modelo (quando habilitado).
+
+## [0.23.0] - 2026-07-09
+
+### Adicionado
+- **migrations.dart**: Migration v10 — colunas `general_knowledge_fallback` em collections e `response_source` em messages.
+- **chat_screen.dart**: Dialog "Configurações da coleção" com 3 toggles (conhecimento geral, busca web, verificar fidelidade). Acessível via ícone ⚙️ na sidebar.
+- **anthropic_service.dart**: Duas variantes de system prompt — estrito (toggle OFF) e permissivo com fallback de conhecimento geral (toggle ON).
+- **ollama_service.dart**: Mesma lógica de variante permissiva para motor Qwen local.
+- **generation_service.dart**: Param `allowGeneralKnowledge` na interface `streamResponse()`.
+- **chat_controller.dart**: Lê toggle `general_knowledge_fallback` da coleção, passa ao motor, persiste `response_source` ('rag' | 'general' | 'web').
+- **citation_strip.dart**: Indicador visual neutro (✨ + texto muted) quando `response_source == 'general'`.
+- **chat_controller.dart**: Trava na promoção por like — resposta de conhecimento geral exige confirmação ("Promover") antes de inserir na base.
+- **message.dart**: Campo `responseSource` no modelo Message.
+- **sidebar.dart**: Callback `onCollectionSettings` + botão ⚙️ no seletor de coleção.
+- **chat_controller.dart**: Getter `database` para acesso ao DB na UI de settings de coleção.
+
+### Alterado
+- **database_helper.dart**: `databaseVersion` → 10, `onCreate` usa `allV10`, `onUpgrade` inclui v9→v10.
+- **app_config.dart**: `databaseVersion` → 10.
+- **chat_screen.dart**: Dialog de confirmação de promoção usa `confirmationMessage` dinâmico. Botão renomeado para "Promover".
+
+## [0.22.2] - 2026-07-09
+
+### Segurança
+- **lock_screen.dart**: Autenticação biométrica reativada — removida flag `_authDisabled = true`. Casos `notConfigured`/`notAvailable` agora exibem mensagem de erro (não navegam para home).
+- **anthropic_service.dart**: Removido log que expunha substring da API key. Agora loga apenas presença e comprimento.
+- **anthropic_service.dart**: Removido getter público `apiKey` — FidelityChecker recebe headers prontos.
+- **anthropic_service.dart**: Instrução de defesa contra prompt injection adicionada antes do contexto RAG.
+- **fidelity_checker.dart**: Refatorado para receber `headers` (Map) em vez de `apiKey` (String) — reduz superfície de exposição de credencial.
+- **DebugProfile.entitlements**: Removida entitlement `network.server` desnecessária.
+
+### Adicionado
+- **docs/auditoria_seguranca_2026-07-09.md**: Relatório completo de auditoria de segurança cibernética (14 achados).
+- **docs/PLANO_CORRECAO_SEGURANCA_2026-07-09.md**: Plano de correção com 5 tasks.
+
 ## [0.22.1] - 2026-07-09
 
 ### Alterado

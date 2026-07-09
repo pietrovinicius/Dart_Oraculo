@@ -1,6 +1,6 @@
 # Regras de Negócio — Dart Oráculo
 
-Auditoria completa das regras implementadas no código-fonte (v0.24.0).
+Auditoria completa das regras implementadas no código-fonte (v0.25.0).
 
 ---
 
@@ -119,11 +119,11 @@ Auditoria completa das regras implementadas no código-fonte (v0.24.0).
 | COL1 | Coleção "Geral" é obrigatória — não pode ser deletada | `lib/features/collections/collection_service.dart` | ~deleteCollection |
 | COL2 | Se "Geral" não existe ao consultar, é recriada (fallback) | `lib/features/collections/collection_service.dart` | ~getDefaultCollection |
 | COL3 | Instruções da coleção limitadas a 500 caracteres | `lib/features/collections/collection_service.dart` | ~createCollection (substring 0,500) |
-| COL4 | Cada coleção possui toggle `verify_before_promote` (default: habilitado) | `lib/core/database/migrations.dart` | ~V7 |
+| COL4 | ~~Toggle `verify_before_promote` por coleção~~ — **obsoleto desde v0.25.0**: config agora é global em Settings (`verify_before_promote_enabled` via Keychain) | `lib/features/settings/settings_screen.dart` | ~_buildFidelitySection |
 | COL5 | ~~Toggle `general_knowledge_fallback` por coleção~~ — **obsoleto desde v0.24.0**: config agora é global em Settings (`general_knowledge_enabled` via Keychain) | `lib/features/settings/settings_screen.dart` | ~_buildGeneralKnowledgeSection |
 | COL6 | Cada coleção possui toggle `web_search_fallback` (default: 0, feature desabilitada) | `lib/core/database/migrations.dart` | ~V9 |
 | COL7 | Documentos e conversas sempre pertencem a uma coleção (`collection_id` NOT NULL via backfill) | `lib/core/database/migrations.dart` | ~V3 |
-| COL8 | Dialog de configurações por coleção exibe toggle de verificação de fidelidade | `lib/features/chat/chat_screen.dart` | ~230-320 |
+| COL8 | ~~Dialog de configurações por coleção exibia toggles~~ — **obsoleto desde v0.25.0**: todos os toggles migrados para Settings global; dialog apenas informa | `lib/features/chat/chat_screen.dart` | ~230-255 |
 
 ---
 
@@ -188,7 +188,11 @@ Auditoria completa das regras implementadas no código-fonte (v0.24.0).
 | CFG4 | Toggle "Lembrar zoom" persistido via `writeRaw('persist_zoom')` — se false, reseta zoom para 1.0 | `lib/features/settings/settings_screen.dart` | ~_buildZoomSection |
 | CFG5 | Chaves de storage centralizadas em `StorageKeys`: `apiKey`, `defaultModel`, `biometricEnabled` | `lib/core/constants/storage_keys.dart` | completo |
 | CFG6 | Database versão 10, nome `dart_oraculo.db` | `lib/core/config/app_config.dart` | ~databaseVersion, databaseName |
-| CFG7 | Constantes RAG centralizadas: `maxChunksPerQuery=10`, `chunkMaxTokens=500`, `maxHistoryMessages=10` | `lib/core/config/app_config.dart` | completo |
+| CFG7 | Constantes RAG (defaults): `maxChunksPerQuery=10`, `chunkMaxTokens=500`, `maxHistoryMessages=10` — agora configuráveis via Settings | `lib/core/config/app_config.dart` + `lib/features/settings/settings_screen.dart` | ~_buildAdvancedSection |
+| CFG8 | Toggle global "Verificar fidelidade" persistido via `writeRaw('verify_before_promote_enabled')` — default `true` | `lib/features/settings/settings_screen.dart` | ~_buildFidelitySection |
+| CFG9 | Slider "Mensagens de contexto" persistido via `writeRaw('max_history_messages')` — range 5–30 | `lib/features/settings/settings_screen.dart` | ~_buildAdvancedSection |
+| CFG10 | Slider "Chunks por busca" persistido via `writeRaw('max_chunks_per_query')` — range 3–20 | `lib/features/settings/settings_screen.dart` | ~_buildAdvancedSection |
+| CFG11 | Slider "Tamanho do chunk" persistido via `writeRaw('chunk_max_tokens')` — range 200–1000. Afeta apenas novos documentos | `lib/features/settings/settings_screen.dart` | ~_buildAdvancedSection |
 
 ---
 
