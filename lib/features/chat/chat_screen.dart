@@ -226,7 +226,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // bool webSearch = (rows.first['web_search_fallback'] as int?) == 1; // WEB_SEARCH_DISABLED
     bool verifyFidelity = (rows.first['verify_before_promote'] as int?) == 1;
-    bool generalKnowledge = (rows.first['general_knowledge_fallback'] as int?) == 1;
+    // bool generalKnowledge — movido para Settings global
 
     if (!mounted) return;
 
@@ -242,20 +242,7 @@ class _ChatScreenState extends State<ChatScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SwitchListTile(
-                title: const Text('Conhecimento geral', style: AppTextStyles.bodyMedium),
-                subtitle: const Text(
-                  'Responder com conhecimento do modelo quando RAG não encontrar contexto',
-                  style: AppTextStyles.bodySmall,
-                ),
-                value: generalKnowledge,
-                activeColor: AppColors.accentOrange,
-                onChanged: (v) async {
-                  setDialogState(() => generalKnowledge = v);
-                  await db.update('collections', {'general_knowledge_fallback': v ? 1 : 0},
-                      where: 'id = ?', whereArgs: [_activeCollectionId]);
-                },
-              ),
+              // --- Toggle "Conhecimento geral" movido para Settings (config global) ---
               // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
               // SwitchListTile(
               //   title: const Text('Busca na web', style: AppTextStyles.bodyMedium),

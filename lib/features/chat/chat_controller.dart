@@ -10,7 +10,7 @@ import '../../core/services/fidelity_checker.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
 import '../../core/services/logger_service.dart';
-// import '../../core/services/secure_storage_service.dart'; // WEB_SEARCH_DISABLED
+import '../../core/services/secure_storage_service.dart';
 // import '../../core/services/web_search_service.dart'; // WEB_SEARCH_DISABLED
 import 'models/conversation.dart';
 import 'models/message.dart';
@@ -226,16 +226,11 @@ class ChatController extends ChangeNotifier {
           '($totalCharsUsed/$maxChars chars)');
     }
 
-    // 2c. Lê toggles da coleção
+    // 2c. Lê toggle global de conhecimento geral (Settings)
     bool allowGeneralKnowledge = false;
     // bool webEnabled = false; // WEB_SEARCH_DISABLED
-    if (collectionId != null) {
-      final colRows = await _db.query('collections', where: 'id = ?', whereArgs: [collectionId]);
-      if (colRows.isNotEmpty) {
-        allowGeneralKnowledge = (colRows.first['general_knowledge_fallback'] as int?) == 1;
-        // webEnabled = (colRows.first['web_search_fallback'] as int?) == 1; // WEB_SEARCH_DISABLED
-      }
-    }
+    final gkSetting = await SecureStorageService().readRaw('general_knowledge_enabled');
+    allowGeneralKnowledge = gkSetting == 'true';
 
     // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
     // var usedWebSearch = false;

@@ -25,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureKey = true;
   // bool _obscureBraveKey = true; // WEB_SEARCH_DISABLED
   bool _persistZoom = true;
+  bool _generalKnowledge = false;
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _controller.addListener(_onControllerChanged);
     _controller.load();
     _loadZoomPref();
+    _loadGeneralKnowledge();
     // _loadBraveKey(); // WEB_SEARCH_DISABLED
   }
 
@@ -85,6 +87,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // _buildBraveKeySection(), // WEB_SEARCH_DISABLED
                   // const SizedBox(height: 32), // WEB_SEARCH_DISABLED
                   _buildModelSection(),
+                  const SizedBox(height: 32),
+                  _buildGeneralKnowledgeSection(),
                   const SizedBox(height: 32),
                   _buildThemeSection(),
                   const SizedBox(height: 32),
@@ -296,6 +300,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   final _storage = SecureStorageService();
+
+  Future<void> _loadGeneralKnowledge() async {
+    final saved = await _storage.readRaw('general_knowledge_enabled');
+    if (mounted) {
+      setState(() => _generalKnowledge = saved == 'true');
+    }
+  }
+
+  Widget _buildGeneralKnowledgeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Conhecimento geral', style: AppTextStyles.bodyLarge),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          title: const Text(
+            'Usar conhecimento do modelo',
+            style: AppTextStyles.bodyMedium,
+          ),
+          subtitle: const Text(
+            'Quando a base RAG não encontrar contexto, permite que o modelo '
+            'responda com seu próprio conhecimento (Opus / Sonnet)',
+            style: AppTextStyles.bodySmall,
+          ),
+          value: _generalKnowledge,
+          activeColor: AppColors.accentOrange,
+          onChanged: (v) async {
+            setState(() => _generalKnowledge = v);
+            await _storage.writeRaw('general_knowledge_enabled', v.toString());
+          },
+        ),
+      ],
+    );
+  }
 
   Future<void> _loadZoomPref() async {
     final saved = await _storage.readRaw('persist_zoom');
