@@ -545,8 +545,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final file = details.files.first;
     final ext = file.name.split('.').last.toLowerCase();
 
-    // Markdown → diálogo de destino
-    if (ext == 'md') {
+    // Markdown / texto plano → diálogo de destino
+    if (ext == 'md' || ext == 'txt') {
       final bytes = await file.readAsBytes();
       final content = String.fromCharCodes(bytes);
       _showMdDestinationDialog(file.name, content);
@@ -559,7 +559,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Formato inválido: .$ext — aceito: JPG, PNG, GIF, WebP, MD'),
+            content: Text('Formato inválido: .$ext — aceito: JPG, PNG, GIF, WebP, MD, TXT'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -767,7 +767,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _importDocument() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'md', 'csv', 'json'],
+      allowedExtensions: ['pdf', 'md', 'txt', 'csv', 'json'],
       allowMultiple: true,
     );
 
@@ -827,7 +827,7 @@ class _ChatScreenState extends State<ChatScreen> {
               }
             },
           );
-        } else if (file.name.endsWith('.md')) {
+        } else if (file.name.endsWith('.md') || file.name.endsWith('.txt')) {
           await _documentService?.ingestMarkdown(
             bytes: bytes,
             filename: file.name,
@@ -1054,7 +1054,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 size: 32,
                                 color: AppColors.accentOrange.withValues(alpha: 0.7)),
                             const SizedBox(width: 12),
-                            Text('Solte a imagem ou .md aqui',
+                            Text('Solte a imagem, .md ou .txt aqui',
                                 style: AppTextStyles.bodyMedium.copyWith(
                                   color: AppColors.accentOrange)),
                           ],
