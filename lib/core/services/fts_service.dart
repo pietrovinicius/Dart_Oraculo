@@ -64,21 +64,25 @@ class FtsService {
       rows = await _executeSearch(orQuery, collectionId, effectiveLimit);
     }
 
-    // 2. Se ainda vazio → prefix match no primeiro termo
+    // 2. Se ainda vazio → prefix match em todos os termos (fuzzy tolerance)
     if (rows.isEmpty) {
-      final firstTerm = sanitized
+      final terms = sanitized
           .replaceAll('"', '')
           .split(' ')
-          .firstWhere((t) => t.isNotEmpty, orElse: () => '');
-      if (firstTerm.isNotEmpty) {
-        final prefixQuery = '$firstTerm*';
+          .where((t) => t.length >= 3)
+          .toList();
+      if (terms.isNotEmpty) {
+        // Trunca cada termo a min(4, length-1) chars + wildcard
+        final prefixQuery = terms
+            .map((t) => '${t.substring(0, t.length > 4 ? 4 : t.length - 1)}*')
+            .join(' OR ');
         LoggerService.instance.info(_tag,
-            'OR retornou 0 → fallback prefix: "$prefixQuery"');
+            'OR retornou 0 → fallback fuzzy-prefix: "$prefixQuery"');
         rows = await _executeSearch(prefixQuery, collectionId, effectiveLimit);
       }
     }
 
-    return rows.map((row) => FtsResult(
+    final results = rows.map((row) => FtsResult(
       chunkId: row['chunk_id'] as int,
       documentId: row['document_id'] as int,
       filename: row['filename'] as String,
@@ -86,6 +90,47 @@ class FtsService {
       content: row['content'] as String,
       rank: (row['rank'] as num).toDouble(),
     )).toList();
+
+    // Re-ranking heurístico: filtra chunks de metadados técnicos (schema noise)
+    final filtered = _rerankResults(results);
+    if (filtered.length < results.length) {
+      LoggerService.instance.info(_tag,
+          'Re-ranking: ${results.length} → ${filtered.length} chunks '
+          '(${results.length - filtered.length} metadata removidos)');
+    }
+    return filtered;
+  }
+
+  /// Padrões que indicam chunks de metadados/schema (noise).
+  static const _metadataPatterns = [
+    'VARCHAR', 'INTEGER', 'NUMBER', 'DATE', 'NOT NULL',
+    'CONSTRAINT', 'PRIMARY KEY', 'FOREIGN KEY', 'DEFAULT',
+    'Tabela ', '||N|', '||M|', '|0|0|',
+  ];
+
+  /// Re-ranking heurístico: remove chunks que são claramente metadados técnicos.
+  /// Chunk é removido se:
+  /// - Contém 4+ padrões de metadados E rank < -2 (não muito relevante)
+  /// - Chunk muito curto (< 30 chars) com rank ruim (< -5)
+  List<FtsResult> _rerankResults(List<FtsResult> results) {
+    if (results.isEmpty) return results;
+
+    return results.where((r) {
+      // Chunk curto + rank ruim → descarta
+      if (r.content.length < 30 && r.rank < -5) return false;
+
+      // Conta padrões de metadados
+      final upperContent = r.content.toUpperCase();
+      var metadataScore = 0;
+      for (final pattern in _metadataPatterns) {
+        if (upperContent.contains(pattern.toUpperCase())) metadataScore++;
+      }
+
+      // Se muitos padrões de metadata e rank não é excelente → descarta
+      if (metadataScore >= 4 && r.rank < -2) return false;
+
+      return true;
+    }).toList();
   }
 
   /// Executa query FTS5 raw com filtro de coleção.

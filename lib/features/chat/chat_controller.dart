@@ -10,6 +10,7 @@ import '../../core/services/fidelity_checker.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
 import '../../core/services/logger_service.dart';
+import '../../core/services/query_reformatter_service.dart';
 import '../../core/services/secure_storage_service.dart';
 // import '../../core/services/web_search_service.dart'; // WEB_SEARCH_DISABLED
 import 'models/conversation.dart';
@@ -36,14 +37,20 @@ class ChatController extends ChangeNotifier {
     required Database database,
     required AnthropicService anthropicService,
     required FtsService ftsService,
+    QueryReformatterService? queryReformatter,
+    SecureStorageService? secureStorage,
   })  : _db = database,
         _anthropicService = anthropicService,
-        _ftsService = ftsService;
+        _ftsService = ftsService,
+        _secureStorage = secureStorage ?? SecureStorageService(),
+        _queryReformatter = queryReformatter ?? QueryReformatterService(storage: secureStorage);
 
   static const _tag = 'ChatController';
   final Database _db;
   final AnthropicService _anthropicService;
   final FtsService _ftsService;
+  final QueryReformatterService _queryReformatter;
+  final SecureStorageService _secureStorage;
 
   /// Acesso ao banco para configurações de coleção na UI.
   Database get database => _db;
@@ -141,10 +148,28 @@ class ChatController extends ChangeNotifier {
         'Base: $docCount documentos, $chunkCount chunks '
         '(coleção=${collectionId ?? "todas"})');
 
-    // 1. Busca chunks relevantes via FTS5 (filtrado por coleção)
-    final chunksStr = await SecureStorageService().readRaw('max_chunks_per_query');
+    // 1. Reformula query (LLM) + Busca chunks via FTS5
+    final chunksStr = await _secureStorage.readRaw('max_chunks_per_query');
     final maxChunks = int.tryParse(chunksStr ?? '') ?? AppConfig.maxChunksPerQuery;
-    final ftsResults = await _ftsService.search(question, collectionId: collectionId, limit: maxChunks);
+
+    // 1a. Reformulação inteligente da query (timeout 2s, fallback para original)
+    final reformattedQuery = await _queryReformatter.reformat(question);
+    if (reformattedQuery != question) {
+      LoggerService.instance.info(_tag,
+          'Query reformulada: "$question" → "$reformattedQuery"');
+    }
+
+    // 1b. Busca FTS5 com query reformulada
+    var ftsResults = await _ftsService.search(reformattedQuery, collectionId: collectionId, limit: maxChunks);
+
+    // 1c. Auto-retry: se 0 resultados e query tem múltiplos termos, tenta com top 2 termos
+    if (ftsResults.isEmpty && reformattedQuery.split(' ').length > 2) {
+      final shortQuery = reformattedQuery.split(' ').take(2).join(' ');
+      LoggerService.instance.info(_tag,
+          'Auto-retry com query curta: "$shortQuery"');
+      ftsResults = await _ftsService.search(shortQuery, collectionId: collectionId, limit: maxChunks);
+    }
+
     LoggerService.instance.info(_tag, 'FTS5 retornou ${ftsResults.length} chunks');
 
     // Log detalhado de cada chunk retornado
@@ -231,7 +256,7 @@ class ChatController extends ChangeNotifier {
     // 2c. Lê toggle global de conhecimento geral (Settings)
     bool allowGeneralKnowledge = false;
     // bool webEnabled = false; // WEB_SEARCH_DISABLED
-    final gkSetting = await SecureStorageService().readRaw('general_knowledge_enabled');
+    final gkSetting = await _secureStorage.readRaw('general_knowledge_enabled');
     allowGeneralKnowledge = gkSetting == 'true';
 
     // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
@@ -272,7 +297,7 @@ class ChatController extends ChangeNotifier {
         'docs trabalho: ${attachments.length}, web: $usedWebSearch)');
 
     // 3. Recupera histórico recente da conversa
-    final histStr = await SecureStorageService().readRaw('max_history_messages');
+    final histStr = await _secureStorage.readRaw('max_history_messages');
     final maxHistory = int.tryParse(histStr ?? '') ?? AppConfig.maxHistoryMessages;
     final allMessages = await getMessages(conversationId);
     final recentMessages = allMessages.length > maxHistory
@@ -438,7 +463,7 @@ class ChatController extends ChangeNotifier {
     }
 
     // Verifica toggle global de fidelidade (Settings)
-    final verifySetting = await SecureStorageService().readRaw('verify_before_promote_enabled');
+    final verifySetting = await _secureStorage.readRaw('verify_before_promote_enabled');
     if (verifySetting == 'false') {
       LoggerService.instance.info(_tag, 'Skip checagem (toggle desligado em Settings)');
       await _promoteAnswer(messageId);

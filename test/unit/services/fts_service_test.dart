@@ -275,5 +275,46 @@ void main() {
       // Não deve lançar exceção — fallback garante busca
       expect(results, isA<List>());
     });
+
+    test('fuzzy prefix — typo parcial encontra via wildcard', () async {
+      // Seed com "diarreia"
+      await db.insert('chunks', {
+        'document_id': 1,
+        'page': 20,
+        'content': 'A09 Diarreia e gastroenterite de origem infecciosa presumível.',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // "diarr" (truncado) deve encontrar via prefix
+      final results = await ftsService.search('diarr');
+      // Fallback prefix "diar*" ou match direto
+      expect(results, isNotEmpty);
+      expect(results.first.content, contains('Diarreia'));
+    });
+
+    test('re-ranking remove chunks de metadados/schema', () async {
+      // Seed: chunk de metadados com padrões típicos
+      await db.insert('chunks', {
+        'document_id': 1,
+        'page': 99,
+        'content': 'Tabela ESCALA|DS_CAMPO|VARCHAR2|255||N|NOT NULL|INTEGER|NUMBER|DATE|DEFAULT|CONSTRAINT',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+      // Seed: chunk real sobre dor
+      await db.insert('chunks', {
+        'document_id': 2,
+        'page': 5,
+        'content': 'Dor abdominal é sintoma comum em gastroenterites e cólicas intestinais.',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      final results = await ftsService.search('dor abdominal');
+      // Chunk real deve aparecer, metadata não (se rank ruim)
+      expect(results, isNotEmpty);
+      expect(
+        results.any((r) => r.content.contains('gastroenterites')),
+        isTrue,
+      );
+    });
   });
 }

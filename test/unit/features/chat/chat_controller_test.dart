@@ -4,6 +4,7 @@ import 'package:dart_oraculo/core/config/app_config.dart';
 import 'package:dart_oraculo/core/database/migrations.dart';
 import 'package:dart_oraculo/core/services/anthropic_service.dart';
 import 'package:dart_oraculo/core/services/fts_service.dart';
+import 'package:dart_oraculo/core/services/secure_storage_service.dart';
 import 'package:dart_oraculo/features/chat/chat_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -25,7 +26,7 @@ void main() {
         version: 4,
         singleInstance: false,
         onCreate: (db, version) async {
-          for (final sql in Migrations.allV9) {
+          for (final sql in Migrations.allV10) {
             await db.execute(sql);
           }
         },
@@ -70,6 +71,7 @@ void main() {
       database: db,
       anthropicService: anthropicService,
       ftsService: ftsService,
+      secureStorage: SecureStorageService(testStore: {}),
     );
   });
 
