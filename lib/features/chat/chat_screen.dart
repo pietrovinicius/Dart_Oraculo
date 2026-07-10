@@ -68,6 +68,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollController = ScrollController();
   bool _stopRequested = false;
   String? _lastFailedQuestion;
+  String? _lastError;
   bool _showScrollToBottom = false;
   bool _isDragOver = false;
   double _textScale = 1.0; // Zoom de texto: 0.5 → 2.0
@@ -700,6 +701,7 @@ class _ChatScreenState extends State<ChatScreen> {
     // 1. Mostra mensagem do usuário imediatamente
     setState(() {
       _lastFailedQuestion = null;
+      _lastError = null;
       _messages = [
         ..._messages,
         Message(
@@ -740,13 +742,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 3. Carrega mensagens reais do banco (substitui as temporárias)
       await _loadMessages(_activeConversationId!);
-    } on AnthropicException catch (_) {
+    } on AnthropicException catch (e) {
       if (mounted) {
-        setState(() => _lastFailedQuestion = text);
+        setState(() {
+          _lastFailedQuestion = text;
+          _lastError = e.message;
+        });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
-        setState(() => _lastFailedQuestion = text);
+        setState(() {
+          _lastFailedQuestion = text;
+          _lastError = e.toString();
+        });
       }
     } finally {
       _thinkingStopwatch.stop();
@@ -1335,6 +1343,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (hasRetry && index == _messages.length) {
           return RetryBubble(
             onRetry: () => _sendMessage(_lastFailedQuestion!),
+            errorMessage: _lastError,
           );
         }
 

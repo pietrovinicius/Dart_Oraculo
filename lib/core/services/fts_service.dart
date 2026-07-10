@@ -152,12 +152,38 @@ class FtsService {
     return false;
   }
 
+  /// Extrai linguagem natural de uma query, ignorando blocos de código/SQL.
+  /// Heurística: linhas que começam com keyword SQL são descartadas.
+  static final _sqlLinePattern = RegExp(
+    r'^\s*(SELECT|FROM|WHERE|AND|OR|INSERT|UPDATE|DELETE|JOIN|LEFT|RIGHT|'
+    r'GROUP|ORDER|HAVING|UNION|CREATE|ALTER|DROP|SET|INTO|VALUES|LIMIT|'
+    r'OFFSET|CASE|WHEN|THEN|ELSE|END|AS|ON|IN|NOT|LIKE|BETWEEN|EXISTS|'
+    r'IS|NULL|DISTINCT|COUNT|SUM|AVG|MAX|MIN|OVER|PARTITION|WITH)\b',
+    caseSensitive: false,
+  );
+
+  String _extractNaturalLanguage(String query) {
+    final lines = query.split('\n');
+    if (lines.length <= 1) return query; // single line → usa tudo
+
+    final natural = lines
+        .where((l) => l.trim().isNotEmpty && !_sqlLinePattern.hasMatch(l))
+        .toList();
+
+    // Se nenhuma linha natural, fallback para query completa
+    if (natural.isEmpty) return query;
+    return natural.join(' ');
+  }
+
   /// Sanitiza query para FTS5 priorizando termos técnicos:
-  /// 1. Remove stopwords
-  /// 2. Se há termos técnicos (ALLCAPS/underscore) → usa só eles
-  /// 3. Termos com underscore viram phrase match
+  /// 1. Extrai linguagem natural (ignora SQL/code)
+  /// 2. Remove stopwords
+  /// 3. Se há termos técnicos (ALLCAPS/underscore) → usa só eles
+  /// 4. Termos com underscore viram phrase match
+  /// 5. Limita a 8 termos para evitar queries explosivas
   String _sanitizeQuery(String query) {
-    final cleaned = query.replaceAll(RegExp(r'[^\w\s\p{L}_]', unicode: true), ' ');
+    final naturalText = _extractNaturalLanguage(query);
+    final cleaned = naturalText.replaceAll(RegExp(r'[^\w\s\p{L}_]', unicode: true), ' ');
     final words = cleaned.split(RegExp(r'\s+'))
         .where((w) => w.isNotEmpty && !_isStopword(w))
         .toList();
@@ -170,7 +196,10 @@ class FtsService {
     // Prioriza termos técnicos se existem
     final priority = technical.isNotEmpty ? technical : words;
 
-    return priority
+    // Limita a 8 termos para evitar queries FTS5 monstruosas
+    final limited = priority.take(8).toList();
+
+    return limited
         .map((w) => w.contains('_') ? '"$w"' : w)
         .join(' ');
   }

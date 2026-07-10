@@ -5,9 +5,10 @@ import '../../../core/theme/app_text_styles.dart';
 
 /// Bolha de erro com botão de retry exibida quando a API falha.
 class RetryBubble extends StatelessWidget {
-  const RetryBubble({super.key, required this.onRetry});
+  const RetryBubble({super.key, required this.onRetry, this.errorMessage});
 
   final VoidCallback onRetry;
+  final String? errorMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +38,15 @@ class RetryBubble extends StatelessWidget {
                 ),
               ],
             ),
+            if (errorMessage != null && errorMessage!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                errorMessage!.length > 120
+                    ? '${errorMessage!.substring(0, 120)}…'
+                    : errorMessage!,
+                style: AppTextStyles.bodySmall,
+              ),
+            ],
             const SizedBox(height: 10),
             SizedBox(
               height: 32,

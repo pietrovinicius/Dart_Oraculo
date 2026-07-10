@@ -49,11 +49,23 @@ class _ChatInputState extends State<ChatInput> {
   bool _isListening = false;
   SpeechService? _speechService;
 
+  int _charCount = 0;
+
   @override
   void initState() {
     super.initState();
     _focusNode.addListener(() => _focusNotifier.value = _focusNode.hasFocus);
+    _controller.addListener(_updateCharCount);
     _speechService = widget.speechService ?? SpeechService();
+  }
+
+  void _updateCharCount() {
+    final count = _controller.text.length;
+    if ((count > 500) != (_charCount > 500) || count == 0 || _charCount == 0) {
+      setState(() => _charCount = count);
+    } else {
+      _charCount = count;
+    }
   }
 
   Future<void> _toggleListening() async {
@@ -281,6 +293,20 @@ class _ChatInputState extends State<ChatInput> {
                   ),
                 ],
               ),
+              // Indicador de caracteres (visível apenas acima de 500)
+              if (_charCount > 500)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16, top: 2),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      '$_charCount chars',
+                      style: AppTextStyles.techSmall.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                      ),
+                    ),
+                  ),
+                ),
               // Bottom row — modelo + mic + send
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
