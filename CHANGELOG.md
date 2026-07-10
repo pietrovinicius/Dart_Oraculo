@@ -5,6 +5,45 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.28.0] - 2026-07-10
+
+### Adicionado
+- **docs/PLANO_BUSCA_INTELIGENTE_CID.md**: Arquitetura de 4 soluções para busca inteligente em CSV CID (14.274 linhas, 170+ colunas).
+- **Solução 1 — Ingestão Inteligente**: pipeline especializado para CSV tipo CID. Extrai apenas `CD_DOENCA_CID` + `DS_DOENCA_CID` + categoria, gera chunks enxutos agrupados por faixa CID (A00-A09 = doenças infecciosas intestinais). Chunk indexável com alta precisão FTS5.
+- **Solução 2 — Sinônimos Clínicos**: mapa estático de sinônimos/manifestações para top 50 categorias CID (ex: A09 = "diarreia, gastroenterite, vômito, fezes líquidas"). Anexa sinônimos ao chunk → FTS5 indexa.
+- **Solução 3 — Fallback Web Search**: quando FTS5 retorna 0 chunks ou rank ≤ -0.5, busca web fallback enriquece contexto. Rate limit 1/pergunta.
+- **Solução 4 — Query Expansion LLM**: pré-busca expande termos com sinônimos clínicos via chamada Haiku/flash (3s timeout + cache 24h). "diarreia" → "diarreia A09 K58 gastroenterite fezes-líquidas".
+
+### Contexto
+- Problema: CSV CID tem 14.274 linhas com 170+ colunas por linha. Chunking atual gera chunks gigantes com metadados irrelevantes → FTS5 dilui ranking → busca por "diarreia" retorna chunks de schema (attributes.csv), não CID.
+- Impacto esperado: query "diarreia e dor abdominal" → chunks A09, R10, K58 em vez de schema noise.
+
+### Ordem de Execução
+1. Sol. 1 (Ingestão inteligente CID) — causa raiz
+2. Sol. 2 (Sinônimos clínicos) — cobertura local
+3. Sol. 4 (Query expansion LLM) — inteligência adaptativa
+4. Sol. 3 (Web search fallback) — safety net final
+
+## [0.27.0] - 2026-07-10
+
+### Corrigido
+- **fts_service.dart**: `_sanitizeQuery` agora limita a 8 termos máximo — evita queries FTS5 explosivas com textos longos colados.
+- **fts_service.dart**: `_extractNaturalLanguage` ignora linhas SQL (SELECT/FROM/WHERE etc.) e busca apenas o texto natural da pergunta.
+- **chat_screen.dart**: blocos `catch` agora capturam `e.message`/`e.toString()` e passam para `_lastError` — erro detalhado visível na UI.
+- **retry_bubble.dart**: exibe `errorMessage` como subtitle (truncada a 120 chars) em vez de genérico "Falha ao gerar resposta".
+- **chat_input.dart**: indicador de caracteres visível quando texto > 500 chars (informativo, sem hard limit).
+
+## [0.26.0] - 2026-07-10
+
+### Adicionado
+- **chat_screen.dart**: Suporte a arquivos `.txt` no RAG — file picker, drag & drop e importação por lote.
+- **chat_screen.dart**: `.txt` roteado para `ingestMarkdown` (texto plano é subset válido de markdown).
+- **chat_screen.dart**: Drag & drop de `.txt` exibe dialog de destino (Biblioteca vs Conversa), mesmo comportamento de `.md`.
+
+### Alterado
+- **chat_screen.dart**: Overlay de arraste atualizado: "Solte a imagem, .md ou .txt aqui".
+- **chat_screen.dart**: Mensagem de erro de formato inválido inclui TXT na lista de aceitos.
+
 ## [0.25.0] - 2026-07-09
 
 ### Adicionado
