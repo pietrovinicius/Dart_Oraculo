@@ -150,16 +150,20 @@ class _ChatInputState extends State<ChatInput> {
   }
 
   KeyEventResult _onKeyEvent(FocusNode node, KeyEvent event) {
-    // Só intercepta Cmd+V key down
+    // Só intercepta KeyDownEvent.
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    // Só age se for Cmd+V (paste de imagem).
     final meta = HardwareKeyboard.instance.isMetaPressed;
     if (!meta || event.logicalKey != LogicalKeyboardKey.keyV) {
       return KeyEventResult.ignored;
     }
-    // Verifica clipboard assincronamente
+
+    // Verifica clipboard assincronamente.
     _handlePaste();
-    // Retorna ignored para permitir que o paste de texto funcione normalmente
-    // se não houver imagem. _handlePaste() vai sobrepor com o anexo se encontrar imagem.
+
+    // Retorna ignored para permitir que paste de texto funcione normalmente
+    // via TextField. Se houver imagem no clipboard, _handlePaste() sobrepõe.
     return KeyEventResult.ignored;
   }
 
