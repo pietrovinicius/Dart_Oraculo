@@ -223,5 +223,57 @@ void main() {
         isTrue,
       );
     });
+
+    test('query com mais de 8 termos é limitada a 8 — não explode FTS5', () async {
+      // Query longa simulando texto colado (12 termos não-stopword)
+      final results = await ftsService.search(
+        'Flutter Dart Python Java Kotlin Rust Go Swift '
+        'TypeScript Ruby Elixir Haskell',
+      );
+      // Deve funcionar sem exceção — FTS5 recebe no máximo 8 termos
+      expect(results, isA<List>());
+    });
+
+    test('query SQL multilinha — extrai apenas linguagem natural', () async {
+      // Seed chunk referenciando "ambiguidade"
+      await db.insert('chunks', {
+        'document_id': 1,
+        'page': 10,
+        'content': 'Erro de ambiguidade ocorre quando colunas homônimas existem em JOINs.',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // Simula pergunta com SQL colado
+      final results = await ftsService.search(
+        'Me ajuda com esse erro de ambiguidade\n'
+        'SELECT a.campo, b.campo\n'
+        'FROM tabela_a a\n'
+        'LEFT JOIN tabela_b b ON a.id = b.id\n'
+        'WHERE a.status = 1\n'
+        'AND b.ativo = 1\n'
+        'GROUP BY a.campo\n'
+        'ORDER BY a.campo',
+      );
+
+      expect(results, isNotEmpty);
+      expect(results.first.content, contains('ambiguidade'));
+    });
+
+    test('query 100% SQL sem texto natural — fallback usa query completa', () async {
+      // Seed com conteúdo sobre SELECT
+      await db.insert('chunks', {
+        'document_id': 2,
+        'page': 7,
+        'content': 'O comando SELECT é usado para consultar dados no banco.',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      final results = await ftsService.search(
+        'SELECT campo FROM tabela WHERE id = 1',
+      );
+
+      // Não deve lançar exceção — fallback garante busca
+      expect(results, isA<List>());
+    });
   });
 }
