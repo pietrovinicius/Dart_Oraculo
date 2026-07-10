@@ -186,8 +186,10 @@ class ChatController extends ChangeNotifier {
     }
 
     // 2. Monta contexto a partir dos chunks recuperados
-    //    Trunca chunks grandes conforme limite do motor ativo.
-    final maxChars = activeGenerationService.maxContextCharsPerChunk;
+    //    Trunca chunks grandes conforme user setting (chunk_max_tokens × 4 chars).
+    final chunkTokensSetting = await _secureStorage.readRaw('chunk_max_tokens');
+    final userMaxChars = (int.tryParse(chunkTokensSetting ?? '') ?? AppConfig.chunkMaxTokens) * 4;
+    final maxChars = userMaxChars.clamp(400, activeGenerationService.maxContextCharsPerChunk);
     final contextBuffer = StringBuffer();
     // Injeta instructions da coleção antes do contexto RAG
     if (collectionInstructions != null && collectionInstructions.isNotEmpty) {

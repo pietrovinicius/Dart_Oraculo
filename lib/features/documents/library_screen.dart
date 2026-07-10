@@ -61,6 +61,55 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return Icons.picture_as_pdf_outlined;
   }
 
+  Future<void> _confirmDelete(Document doc) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir documento'),
+        content: Text(
+          'Excluir "${doc.filename}" e todos os seus chunks indexados?\n\n'
+          'Esta ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await widget.documentService.deleteDocument(doc.id!);
+      await _loadDocuments();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${doc.filename}" excluído.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao excluir: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _exportDocument(Document doc) async {
     try {
       final exportPath = await widget.documentService.exportAsMarkdown(doc.id!);
@@ -181,16 +230,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
             ],
             const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                icon: const Icon(Icons.download, size: 16),
-                label: const Text('Extrair .md'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.accentOrange,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.delete_outline, size: 16),
+                  label: const Text('Excluir'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                  ),
+                  onPressed: () => _confirmDelete(doc),
                 ),
-                onPressed: () => _exportDocument(doc),
-              ),
+                TextButton.icon(
+                  icon: const Icon(Icons.download, size: 16),
+                  label: const Text('Extrair .md'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.accentOrange,
+                  ),
+                  onPressed: () => _exportDocument(doc),
+                ),
+              ],
             ),
           ],
         ),
