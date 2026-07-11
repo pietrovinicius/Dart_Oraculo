@@ -1169,7 +1169,15 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(width: 8),
           IconButton(
             icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
-            onPressed: () => Navigator.pushNamed(context, AppRoutes.settings),
+            onPressed: () async {
+              await Navigator.pushNamed(context, AppRoutes.settings);
+              // Recarrega modelo ao voltar de Settings
+              final savedModel = await _storageService.getDefaultModel();
+              if (savedModel != null && savedModel != _selectedModel && mounted) {
+                setState(() => _selectedModel = savedModel);
+                _updateGenerationService(savedModel);
+              }
+            },
           ),
         ],
       ),
