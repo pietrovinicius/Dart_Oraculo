@@ -40,6 +40,16 @@ class SecureStorageService {
 
   Future<bool> hasApiKey() async => (await getApiKey()) != null;
 
+  // --- Kimi API Key ---
+
+  Future<String?> getKimiApiKey() => _read(StorageKeys.kimiApiKey);
+
+  Future<void> setKimiApiKey(String value) => _write(StorageKeys.kimiApiKey, value);
+
+  Future<void> deleteKimiApiKey() => _delete(StorageKeys.kimiApiKey);
+
+  Future<bool> hasKimiApiKey() async => (await getKimiApiKey()) != null;
+
   // --- Default Model ---
 
   Future<String?> getDefaultModel() => _read(StorageKeys.defaultModel);

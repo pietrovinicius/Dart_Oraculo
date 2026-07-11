@@ -19,9 +19,11 @@ import '../../core/services/chunking_service.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
 import '../../core/services/image_resize_service.dart';
+import '../../core/services/kimi_service.dart';
 import '../../core/services/ollama_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/secure_storage_service.dart';
+import '../../core/constants/storage_keys.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../collections/collection_service.dart';
@@ -1269,10 +1271,77 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_chatController == null) return;
     if (model == AppConfig.modelQwen) {
       _chatController!.activeGenerationService = OllamaService();
+    } else if (model == AppConfig.modelKimi) {
+      _updateKimiService();
     } else {
       // Anthropic com o modelo selecionado
       _chatController!.activeGenerationService = _chatController!.anthropicService;
     }
+  }
+
+  Future<void> _updateKimiService() async {
+    final kimiKey = await SecureStorageService().getKimiApiKey();
+    if (kimiKey == null || kimiKey.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Configure a chave Kimi nas Configurações.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        // Reverte para Sonnet
+        setState(() => _selectedModel = AppConfig.defaultModel);
+        _chatController!.activeGenerationService = _chatController!.anthropicService;
+      }
+      return;
+    }
+
+    // Aviso de API externa (primeira vez)
+    final dismissed = await SecureStorageService().readRaw(StorageKeys.kimiWarningDismissed);
+    if (dismissed != 'true' && mounted) {
+      final accepted = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: AppColors.accentOrange),
+              SizedBox(width: 8),
+              Text('API Externa'),
+            ],
+          ),
+          content: const Text(
+            'A Kimi é uma API externa (Moonshot AI). Não há garantia de que '
+            'seus dados não serão usados para treinamento ou estudos pela provedora.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await SecureStorageService().writeRaw(
+                  StorageKeys.kimiWarningDismissed, 'true',
+                );
+                Navigator.pop(context, true);
+              },
+              style: TextButton.styleFrom(foregroundColor: AppColors.accentOrange),
+              child: const Text('Entendi, continuar'),
+            ),
+          ],
+        ),
+      );
+
+      if (accepted != true) {
+        // Usuário cancelou — reverte
+        setState(() => _selectedModel = AppConfig.defaultModel);
+        _chatController!.activeGenerationService = _chatController!.anthropicService;
+        return;
+      }
+    }
+
+    _chatController!.activeGenerationService = KimiService(apiKey: kimiKey);
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {

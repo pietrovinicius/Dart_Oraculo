@@ -21,9 +21,9 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late final SettingsController _controller;
   final _apiKeyController = TextEditingController();
-  // final _braveKeyController = TextEditingController(); // WEB_SEARCH_DISABLED
+  final _kimiKeyController = TextEditingController();
   bool _obscureKey = true;
-  // bool _obscureBraveKey = true; // WEB_SEARCH_DISABLED
+  bool _obscureKimiKey = true;
   bool _persistZoom = true;
   bool _generalKnowledge = false;
   bool _verifyFidelity = true;
@@ -43,7 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadGeneralKnowledge();
     _loadFidelity();
     _loadAdvancedSettings();
-    // _loadBraveKey(); // WEB_SEARCH_DISABLED
+    _loadKimiKey();
   }
 
   void _onControllerChanged() {
@@ -60,11 +60,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return '${key.substring(0, 10)}${'•' * 8}${key.substring(key.length - 4)}';
   }
 
+  Future<void> _loadKimiKey() async {
+    final key = await SecureStorageService().getKimiApiKey();
+    if (key != null && key.isNotEmpty && mounted) {
+      setState(() => _kimiKeyController.text = _maskApiKey(key));
+    }
+  }
+
   @override
   void dispose() {
     _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     _apiKeyController.dispose();
+    _kimiKeyController.dispose();
     super.dispose();
   }
 
@@ -115,84 +123,176 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const Text('Chaves de API', style: AppTextStyles.bodyLarge),
+        const SizedBox(height: 4),
         const Text(
-          'Chave de API da Anthropic',
-          style: AppTextStyles.bodyLarge,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Armazenada de forma segura no Keychain do macOS.',
+          'Armazenadas de forma segura no Keychain do macOS.',
           style: AppTextStyles.bodySmall,
         ),
-        const SizedBox(height: 12),
-        TextField(
+        const SizedBox(height: 16),
+        _buildApiKeyCard(
+          providerName: 'Anthropic (Claude)',
           controller: _apiKeyController,
-          obscureText: _obscureKey,
-          style: AppTextStyles.techMedium,
-          decoration: InputDecoration(
-            hintText: 'sk-ant-...',
-            suffixIcon: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(
-                    _obscureKey ? Icons.visibility_off : Icons.visibility,
-                    color: AppColors.textMuted,
-                  ),
-                  onPressed: () => setState(() => _obscureKey = !_obscureKey),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.save, color: AppColors.accentOrange),
-                  onPressed: () async {
-                    LoggerService.instance.info('SettingsScreen', 'Botão salvar API key pressionado');
-                    final key = _apiKeyController.text.trim();
-                    if (key.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Digite uma chave antes de salvar.'),
-                          backgroundColor: AppColors.error,
-                        ),
-                      );
-                      return;
-                    }
-                    // Não salvar se é a versão mascarada (não editou)
-                    if (key.contains('••••')) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Limpe o campo e cole a nova chave.'),
-                          backgroundColor: AppColors.error,
-                        ),
-                      );
-                      return;
-                    }
-                    try {
-                      await _controller.saveApiKey(key);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Chave salva com sucesso.'),
-                            backgroundColor: AppColors.success,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Erro ao salvar chave: $e'),
-                            backgroundColor: AppColors.error,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
+          obscure: _obscureKey,
+          onToggleObscure: () => setState(() => _obscureKey = !_obscureKey),
+          hintText: 'sk-ant-...',
+          isConfigured: _apiKeyController.text.isNotEmpty,
+          onSave: () => _saveAnthropicKey(),
+        ),
+        const SizedBox(height: 12),
+        _buildApiKeyCard(
+          providerName: 'Moonshot (Kimi)',
+          controller: _kimiKeyController,
+          obscure: _obscureKimiKey,
+          onToggleObscure: () => setState(() => _obscureKimiKey = !_obscureKimiKey),
+          hintText: 'sk-...',
+          isConfigured: _kimiKeyController.text.isNotEmpty,
+          onSave: () => _saveKimiKey(),
+          isOptional: true,
         ),
       ],
     );
+  }
+
+  Widget _buildApiKeyCard({
+    required String providerName,
+    required TextEditingController controller,
+    required bool obscure,
+    required VoidCallback onToggleObscure,
+    required String hintText,
+    required bool isConfigured,
+    required VoidCallback onSave,
+    bool isOptional = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(providerName, style: AppTextStyles.bodyMedium),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isConfigured
+                      ? AppColors.success.withValues(alpha: 0.15)
+                      : AppColors.accentOrange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  isConfigured ? '✅ Configurada' : '⚠️ Ausente',
+                  style: AppTextStyles.techSmall.copyWith(
+                    color: isConfigured ? AppColors.success : AppColors.accentOrange,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            obscureText: obscure,
+            style: AppTextStyles.techMedium,
+            decoration: InputDecoration(
+              hintText: hintText,
+              isDense: true,
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      obscure ? Icons.visibility_off : Icons.visibility,
+                      color: AppColors.textMuted,
+                      size: 18,
+                    ),
+                    onPressed: onToggleObscure,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.save, color: AppColors.accentOrange, size: 18),
+                    onPressed: onSave,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isOptional) ...<Widget>[
+            const SizedBox(height: 6),
+            const Text(
+              'Opcional — sem ela, o motor Kimi não aparece no seletor.',
+              style: AppTextStyles.techSmall,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveAnthropicKey() async {
+    final key = _apiKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Digite uma chave antes de salvar.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    if (key.contains('••••')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Limpe o campo e cole a nova chave.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    try {
+      await _controller.saveApiKey(key);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chave Anthropic salva.'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveKimiKey() async {
+    final key = _kimiKeyController.text.trim();
+    if (key.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Digite uma chave antes de salvar.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    if (key.contains('••••')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Limpe o campo e cole a nova chave.'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    try {
+      await SecureStorageService().setKimiApiKey(key);
+      if (mounted) {
+        setState(() {}); // Atualiza indicador
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Chave Kimi salva.'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
   }
 
   Widget _buildModelSection() {
@@ -213,6 +313,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           title: 'Opus',
           subtitle: 'Raciocínio mais profundo, ideal para análises complexas',
           value: AppConfig.modelOpus,
+        ),
+        _buildModelTile(
+          title: 'Kimi K2.6',
+          subtitle: 'Moonshot AI — janela 256K, custo baixo',
+          value: AppConfig.modelKimi,
         ),
         _buildModelTile(
           title: 'Qwen (Local)',

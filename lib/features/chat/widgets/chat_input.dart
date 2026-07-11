@@ -187,6 +187,7 @@ class _ChatInputState extends State<ChatInput> {
   String _modelLabel(String model) {
     if (model.contains('sonnet')) return 'Sonnet';
     if (model.contains('opus')) return 'Opus';
+    if (model.contains('kimi')) return 'Kimi';
     if (model.contains('qwen')) return 'Qwen';
     return model;
   }
@@ -339,6 +340,7 @@ class _ChatInputState extends State<ChatInput> {
                       itemBuilder: (_) => [
                         const PopupMenuItem(value: AppConfig.modelSonnet, child: Text('Sonnet')),
                         const PopupMenuItem(value: AppConfig.modelOpus, child: Text('Opus')),
+                        const PopupMenuItem(value: AppConfig.modelKimi, child: Text('Kimi K2.6')),
                         const PopupMenuItem(value: AppConfig.modelQwen, child: Text('Qwen (Local)')),
                       ],
                       onSelected: widget.onModelChanged,

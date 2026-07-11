@@ -3,7 +3,7 @@ class AppConfig {
   AppConfig._();
 
   static const String appName = 'Dart Oráculo';
-  static const String appVersion = '0.30.0';
+  static const String appVersion = '0.31.0';
 
   // API Anthropic
   static const String anthropicBaseUrl =
@@ -13,12 +13,17 @@ class AppConfig {
   // Modelos disponíveis
   static const String modelSonnet = 'claude-sonnet-4-6';
   static const String modelOpus = 'claude-opus-4-8';
+  static const String modelKimi = 'kimi-k2.6';
   static const String modelQwen = 'qwen-local';
   static const String defaultModel = modelSonnet;
 
   // Ollama
   static const String ollamaBaseUrl = 'http://localhost:11434';
   static const String ollamaModel = 'qwen3.5:latest';
+
+  // Kimi (Moonshot AI)
+  static const String kimiBaseUrl = 'https://api.moonshot.ai/v1/chat/completions';
+  static const String kimiModel = 'kimi-k2.6';
 
   // RAG
   static const int maxChunksPerQuery = 10;
