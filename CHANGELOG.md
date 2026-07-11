@@ -5,6 +5,65 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.31.0] - 2026-07-10
+
+### Adicionado
+- **kimi_service.dart**: Novo motor de geração Kimi K2.6 (Moonshot AI) implementando GenerationService. API compatível OpenAI, streaming SSE, endpoint api.moonshot.ai/v1, janela 256K tokens, maxContextCharsPerChunk=80000.
+- **app_config.dart**: Constantes `modelKimi`, `kimiBaseUrl`, `kimiModel`.
+- **storage_keys.dart**: Chaves `kimiApiKey` e `kimiWarningDismissed` para Keychain.
+- **secure_storage_service.dart**: Métodos `getKimiApiKey()`, `setKimiApiKey()`, `deleteKimiApiKey()`, `hasKimiApiKey()`.
+- **chat_input.dart**: Kimi K2.6 adicionado ao seletor de modelo (entre Opus e Qwen).
+- **chat_screen.dart**: Aviso de API externa na primeira seleção de Kimi — "Não há garantia de que seus dados não serão usados para treinamento ou estudos pela provedora." Com opção "Não mostrar novamente".
+- **chat_screen.dart**: Integração completa — selecionar Kimi verifica chave, exibe aviso, instancia KimiService.
+- **settings_screen.dart**: Seção "Chaves de API" redesenhada com 2 cards (Anthropic + Kimi). Indicador visual ✅/⚠️ por provedor. Chave Kimi opcional.
+- **settings_screen.dart**: Kimi K2.6 adicionado à lista de modelos padrão.
+- **docs/plano_kimi_multiplas_chaves.md**: Plano de implementação completo.
+
+### Corrigido
+- **chat_screen.dart**: Modelo selecionado nas Settings agora é recarregado ao voltar ao chat — antes, mudar modelo no Settings não refletia até reiniciar o app.
+
+### Comportamento
+- Kimi disponível em todas as coleções (sem bloqueio).
+- Sem chave configurada → item Kimi aparece no seletor mas reverte com toast ao tentar usar.
+- Aviso de API externa exibido uma vez — checkbox "Não mostrar novamente" persiste no Keychain.
+- Custo Kimi: ~$0.001/1K input tokens (~10x mais barato que Sonnet).
+- Ao voltar de Settings → modelo atualizado imediatamente no seletor e no motor ativo.
+
+## [0.30.0] - 2026-07-10
+
+### Adicionado
+- **library_screen.dart**: Botão "Excluir" em cada documento da Biblioteca — remove documento + todos os chunks do FTS5 com confirmação.
+- **docs/PLANO_REDUCAO_CUSTO_API.md**: Plano completo com 6 soluções para redução de custo da API Claude.
+
+### Corrigido
+- **chat_controller.dart**: Truncagem de contexto RAG agora respeita `chunk_max_tokens` do Settings (user × 4 chars) em vez do permissivo `maxContextCharsPerChunk` do motor (20.000 chars). Reduz custo de ~$0.22 para ~$0.005/consulta com config 300 tokens.
+
+### Comportamento
+- Config "Tamanho do chunk = 300" → cada chunk no contexto limitado a 1200 chars máximo.
+- 5 chunks × 1200 chars = ~6KB = ~1.500 tokens input (antes: 73.000 tokens com CSVs gigantes).
+- Botão excluir remove documento e chunks permanentemente — ação irreversível com confirmação.
+
+## [0.29.0] - 2026-07-10
+
+### Adicionado
+- **query_reformatter_service.dart**: Novo serviço que reformula queries confusas do usuário via LLM (Haiku) antes do FTS5. Timeout 2s, cache 1h, fallback para query original. Toggle "Reformulação inteligente" em Settings.
+- **chat_controller.dart**: Integração do QueryReformatterService — query reformulada antes de buscar FTS5.
+- **chat_controller.dart**: Auto-retry — se FTS5 retorna 0 chunks, tenta novamente com top 2 termos da query reformulada.
+- **fts_service.dart**: Fuzzy prefix matching expandido — fallback trunca cada termo a 4 chars + wildcard ("dirr*" → encontra "diarreia").
+- **fts_service.dart**: Re-ranking heurístico — filtra chunks de metadados/schema (VARCHAR, INTEGER, NOT NULL etc.) com rank ruim. Evita noise técnico nos resultados.
+- **docs/PLANO_RAG_USUARIO_CONFUSO.md**: Plano completo com 6 soluções para RAG com usuário confuso.
+- **test/unit/services/query_reformatter_service_test.dart**: 7 testes (reformulação, toggle, timeout, cache, fallback).
+
+### Corrigido
+- **chat_controller.dart**: `SecureStorageService` agora injetável — resolve falha em testes sem Flutter bindings.
+- **test/**: Todos os testes de ChatController atualizados para usar Migrations.allV10 + SecureStorageService com testStore.
+
+### Comportamento
+- Query confusa "pesquisa entao diarreia" → reformulada para "diarreia" antes do FTS5.
+- Typo "dirreia" → fuzzy prefix "dir*" → encontra "diarreia".
+- Chunks de schema (attributes.csv) com 4+ padrões de metadados + rank ruim → removidos do resultado.
+- 0 resultados → auto-retry com top 2 termos (transparente ao usuário).
+
 ## [0.28.0] - 2026-07-10
 
 ### Adicionado
