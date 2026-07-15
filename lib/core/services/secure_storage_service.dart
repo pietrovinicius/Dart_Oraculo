@@ -21,9 +21,9 @@ class SecureStorageService {
   SecureStorageService._internal()
       : _storage = const FlutterSecureStorage(
           mOptions: MacOsOptions(
-            // true = data-protection keychain (desbloqueia uma vez ao login,
-            // não pede senha por item). false = login keychain (prompt por acesso).
-            useDataProtectionKeyChain: true,
+            // false = login keychain (necessário com sandbox desabilitado).
+            // Singleton garante sessão única → Keychain pede uma vez por run.
+            useDataProtectionKeyChain: false,
             accessibility: KeychainAccessibility.first_unlock,
           ),
         ),
@@ -34,7 +34,7 @@ class SecureStorageService {
       : _storage = storage ??
             const FlutterSecureStorage(
               mOptions: MacOsOptions(
-                useDataProtectionKeyChain: true,
+                useDataProtectionKeyChain: false,
                 accessibility: KeychainAccessibility.first_unlock,
               ),
             );
