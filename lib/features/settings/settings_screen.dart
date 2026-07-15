@@ -403,7 +403,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: ThemeMode.dark,
                 groupValue: notifier.mode,
                 activeColor: AppColors.accentOrange,
-                onChanged: (v) => notifier.setMode(v!),
+                onChanged: (v) => notifier.setMode(v!, context),
               ),
               RadioListTile<ThemeMode>(
                 title: const Text('🖥️  Sistema', style: AppTextStyles.bodyMedium),
@@ -412,7 +412,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: ThemeMode.system,
                 groupValue: notifier.mode,
                 activeColor: AppColors.accentOrange,
-                onChanged: (v) => notifier.setMode(v!),
+                onChanged: (v) => notifier.setMode(v!, context),
               ),
             ],
           ),
