@@ -4,6 +4,7 @@ import '../../core/config/app_config.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/services/app_settings_cache.dart';
 import '../../core/services/chunking_service.dart';
+import '../../core/services/error_feedback_service.dart';
 import '../../core/services/logger_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/secure_storage_service.dart';
@@ -770,23 +771,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-      await docService.reindexCollection2();
+      final result = await docService.reindexCollection2();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Re-indexação concluída!'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+
+      final failed = result['failed'] as int;
+      final success = result['success'] as int;
+      final failedDocs = result['failedDocs'] as List<String>;
+
+      if (failed == 0) {
+        ErrorFeedbackService.showWarning(
+          context,
+          'Re-indexação completa: $success documentos processados.',
+        );
+      } else {
+        ErrorFeedbackService.showError(
+          context,
+          'Re-indexação Parcial',
+          '$success sucesso, $failed falharam: ${failedDocs.join(", ")}',
+        );
+      }
     } catch (e) {
       LoggerService.instance.error('SettingsScreen', 'Erro na re-indexação: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro: $e'),
-          backgroundColor: Colors.red,
-        ),
+      ErrorFeedbackService.showError(
+        context,
+        'Erro na Re-indexação',
+        e.toString(),
       );
     }
   }

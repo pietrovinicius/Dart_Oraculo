@@ -427,6 +427,80 @@ void main() {
     });
   });
 
+  group('DocumentService — reindexCollection2 partial failure report', () {
+    test('returns success/failed counts and failedDocs list', () async {
+      // Arrange: insert 2 documents in collection 2
+      // Doc 1: valid sourcePath with a real markdown file
+      final tempDir = Directory.systemTemp.createTempSync('reindex_test_');
+      final validFile = File('${tempDir.path}/valid.md');
+      await validFile.writeAsString('Conteúdo válido do documento.');
+
+      // Doc 2: invalid sourcePath (file does not exist)
+      final invalidPath = '${tempDir.path}/nao_existe.pdf';
+
+      await db.insert('documents', {
+        'filename': 'valid.md',
+        'source_path': validFile.path,
+        'collection_id': 2,
+        'imported_at': DateTime.now().toIso8601String(),
+      });
+
+      await db.insert('documents', {
+        'filename': 'missing.pdf',
+        'source_path': invalidPath,
+        'collection_id': 2,
+        'imported_at': DateTime.now().toIso8601String(),
+      });
+
+      // Act
+      final result = await documentService.reindexCollection2();
+
+      // Assert: returns map with success/failed counts
+      expect(result['success'], equals(1));
+      expect(result['failed'], equals(1));
+      expect(result['failedDocs'], isA<List<String>>());
+      expect(result['failedDocs'], contains('missing.pdf'));
+
+      // Cleanup
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('returns all success when no failures', () async {
+      // Arrange: insert 1 document with valid sourcePath
+      final tempDir = Directory.systemTemp.createTempSync('reindex_ok_');
+      final validFile = File('${tempDir.path}/doc_ok.md');
+      await validFile.writeAsString('Documento OK para re-indexação.');
+
+      await db.insert('documents', {
+        'filename': 'doc_ok.md',
+        'source_path': validFile.path,
+        'collection_id': 2,
+        'imported_at': DateTime.now().toIso8601String(),
+      });
+
+      // Act
+      final result = await documentService.reindexCollection2();
+
+      // Assert
+      expect(result['success'], equals(1));
+      expect(result['failed'], equals(0));
+      expect(result['failedDocs'], isEmpty);
+
+      // Cleanup
+      tempDir.deleteSync(recursive: true);
+    });
+
+    test('returns empty result when collection has no documents', () async {
+      // Act: no docs in collection 2
+      final result = await documentService.reindexCollection2();
+
+      // Assert
+      expect(result['success'], equals(0));
+      expect(result['failed'], equals(0));
+      expect(result['failedDocs'], isEmpty);
+    });
+  });
+
   group('DocumentService — batch inserts + isolate', () {
     test('ingestStructuredData com volume grande usa batch (1500+ rows)', () async {
       // Gera CSV sintético com 1500 rows (forçará pelo menos 2 batches de 1000)

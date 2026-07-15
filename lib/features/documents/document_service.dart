@@ -425,4 +425,145 @@ class DocumentService {
     await _db.delete('chunks', where: 'document_id = ?', whereArgs: [documentId]);
     await _db.delete('documents', where: 'id = ?', whereArgs: [documentId]);
   }
+
+  /// Re-indexa collection 2 (limpa chunks e re-importa documentos).
+  /// Usado para corrigir metadados malformados.
+  /// Retorna mapa com contagem de sucesso/falha e lista de documentos que falharam.
+  Future<Map<String, dynamic>> reindexCollection2() async {
+    LoggerService.instance.info(_tag, 'Iniciando re-indexação da collection 2...');
+
+    // 1. Listar todos os documentos da collection 2
+    final docs = await _db.query(
+      'documents',
+      where: 'collection_id = ?',
+      whereArgs: [2],
+    );
+    LoggerService.instance.info(_tag, 'Collection 2: ${docs.length} documentos');
+
+    if (docs.isEmpty) {
+      LoggerService.instance.info(_tag, 'Nenhum documento na collection 2, nada a fazer');
+      return {'success': 0, 'failed': 0, 'failedDocs': <String>[]};
+    }
+
+    int successCount = 0;
+    final failedDocs = <String>[];
+
+    // 2. Para cada documento, excluir chunks e reimportar
+    for (final docRow in docs) {
+      final docId = docRow['id'] as int;
+      final filename = docRow['filename'] as String;
+      final sourcePath = docRow['source_path'] as String?;
+
+      LoggerService.instance.info(_tag, 'Re-indexando documento: $filename (ID=$docId)');
+
+      // 2a. Deletar chunks antigos
+      final deletedCount = await _db.delete(
+        'chunks',
+        where: 'document_id = ?',
+        whereArgs: [docId],
+      );
+      LoggerService.instance.info(_tag, '  Deletados $deletedCount chunks antigos');
+
+      // 2b. Reimportar arquivo original (requer sourcePath)
+      if (sourcePath != null && sourcePath.isNotEmpty) {
+        try {
+          final file = File(sourcePath);
+          if (!file.existsSync()) {
+            LoggerService.instance.warn(
+              _tag,
+              '  Arquivo não encontrado: $sourcePath',
+            );
+            failedDocs.add(filename);
+            continue;
+          }
+
+          final bytes = await file.readAsBytes();
+          final ext = sourcePath.toLowerCase().endsWith('.pdf') ? 'pdf' : 'md';
+
+          if (ext == 'pdf') {
+            await _reindexDocumentChunks(
+              docId: docId,
+              bytes: bytes,
+              filename: filename,
+              collectionId: 2,
+              isPdf: true,
+            );
+          } else {
+            await _reindexDocumentChunks(
+              docId: docId,
+              bytes: bytes,
+              filename: filename,
+              collectionId: 2,
+              isPdf: false,
+            );
+          }
+
+          successCount++;
+          LoggerService.instance.info(_tag, '  Re-indexado com sucesso');
+        } catch (e) {
+          failedDocs.add(filename);
+          LoggerService.instance.error(_tag, '  Erro ao re-indexar $filename: $e');
+        }
+      } else {
+        failedDocs.add(filename);
+        LoggerService.instance.warn(
+          _tag,
+          '  Sem sourcePath, pulando documento $filename',
+        );
+      }
+    }
+
+    LoggerService.instance.info(
+      _tag,
+      'Re-indexação concluída: $successCount sucesso, ${failedDocs.length} falhas',
+    );
+
+    return {
+      'success': successCount,
+      'failed': failedDocs.length,
+      'failedDocs': failedDocs,
+    };
+  }
+
+  /// Re-indexa chunks de um documento específico (helper para reindexCollection2).
+  Future<void> _reindexDocumentChunks({
+    required int docId,
+    required Uint8List bytes,
+    required String filename,
+    required int collectionId,
+    required bool isPdf,
+  }) async {
+    final List<TextChunk> textChunks;
+
+    if (isPdf) {
+      final pages = await _pdfService.extractText(bytes);
+      final markdown = _normalizer.normalize(pages);
+      final markdownPages = [
+        PdfPageResult(pageNumber: 1, text: markdown),
+      ];
+      textChunks = _chunkingService.chunkPages(markdownPages);
+    } else {
+      final content = utf8.decode(bytes);
+      final markdownPages = [
+        PdfPageResult(pageNumber: 0, text: content),
+      ];
+      textChunks = _chunkingService.chunkPages(markdownPages);
+    }
+
+    // Inserir chunks novos com document_id correto
+    final now = DateTime.now();
+    for (final chunk in textChunks) {
+      await _db.insert('chunks', {
+        'document_id': docId,
+        'page': chunk.page,
+        'content': chunk.content,
+        'created_at': now.toIso8601String(),
+      });
+    }
+
+    LoggerService.instance.info(
+      _tag,
+      '    Criados ${textChunks.length} chunks para doc $docId',
+    );
+  }
 }
