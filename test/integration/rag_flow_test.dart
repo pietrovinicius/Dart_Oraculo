@@ -79,7 +79,7 @@ void main() {
         httpClient: mockClient,
       ),
       ftsService: FtsService(database: db),
-      secureStorage: SecureStorageService(testStore: {}),
+      secureStorage: SecureStorageService.test(testStore: {}),
     );
   });
 

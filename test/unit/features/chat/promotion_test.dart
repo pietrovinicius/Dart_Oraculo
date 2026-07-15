@@ -49,7 +49,7 @@ void main() {
       database: db,
       anthropicService: anthropicService,
       ftsService: ftsService,
-      secureStorage: SecureStorageService(testStore: {}),
+      secureStorage: SecureStorageService.test(testStore: {}),
     );
 
     // Seed: coleção + conversa + mensagens

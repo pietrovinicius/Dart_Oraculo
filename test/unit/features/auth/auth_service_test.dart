@@ -119,7 +119,7 @@ void main() {
 
   setUp(() {
     fakeLocalAuth = FakeLocalAuth();
-    storageService = SecureStorageService(storage: FakeSecureStorage());
+    storageService = SecureStorageService.test(storage: FakeSecureStorage());
     authService = AuthService(
       storageService: storageService,
       localAuth: fakeLocalAuth,

@@ -15,14 +15,31 @@ class SecureStorageException implements Exception {
 /// Wrapper sobre flutter_secure_storage.
 /// Falha de Keychain surfaça como erro — nunca grava em texto plano.
 class SecureStorageService {
-  SecureStorageService({FlutterSecureStorage? storage, this.testStore})
+  /// Singleton — garante sessão única de Keychain (evita prompts repetidos).
+  factory SecureStorageService() => _instance;
+
+  SecureStorageService._internal()
+      : _storage = const FlutterSecureStorage(
+          mOptions: MacOsOptions(
+            // true = data-protection keychain (desbloqueia uma vez ao login,
+            // não pede senha por item). false = login keychain (prompt por acesso).
+            useDataProtectionKeyChain: true,
+            accessibility: KeychainAccessibility.first_unlock,
+          ),
+        ),
+        testStore = null;
+
+  /// Construtor para testes — injeta storage mock.
+  SecureStorageService.test({FlutterSecureStorage? storage, this.testStore})
       : _storage = storage ??
             const FlutterSecureStorage(
               mOptions: MacOsOptions(
-                useDataProtectionKeyChain: false,
+                useDataProtectionKeyChain: true,
                 accessibility: KeychainAccessibility.first_unlock,
               ),
             );
+
+  static final SecureStorageService _instance = SecureStorageService._internal();
 
   static const _tag = 'SecureStorage';
   final FlutterSecureStorage _storage;

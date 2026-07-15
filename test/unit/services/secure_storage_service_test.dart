@@ -88,7 +88,7 @@ void main() {
 
   setUp(() {
     fakeStorage = FakeSecureStorage();
-    service = SecureStorageService(storage: fakeStorage);
+    service = SecureStorageService.test(storage: fakeStorage);
   });
 
   group('SecureStorageService', () {

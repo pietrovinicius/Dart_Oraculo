@@ -88,7 +88,7 @@ void main() {
   late SecureStorageService storageService;
 
   setUp(() {
-    storageService = SecureStorageService(storage: FakeSecureStorage());
+    storageService = SecureStorageService.test(storage: FakeSecureStorage());
     controller = SettingsController(storageService: storageService);
   });
 
