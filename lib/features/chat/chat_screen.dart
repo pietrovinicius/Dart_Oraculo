@@ -22,6 +22,7 @@ import '../../core/services/image_resize_service.dart';
 import '../../core/services/kimi_service.dart';
 import '../../core/services/ollama_service.dart';
 import '../../core/services/pdf_service.dart';
+import '../../core/services/app_settings_cache.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../core/constants/storage_keys.dart';
 import '../../core/theme/app_colors.dart';
@@ -84,8 +85,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _initialize();
   }
 
-  Future<void> _loadChunkMaxTokens() async {
-    final saved = await _storageService.readRaw('chunk_max_tokens');
+  void _loadChunkMaxTokens() {
+    final saved = AppSettingsCache().get('chunk_max_tokens');
     if (saved != null) {
       final parsed = int.tryParse(saved);
       if (parsed != null && mounted) {
@@ -94,8 +95,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _loadTextScale() async {
-    final saved = await _storageService.readRaw('text_scale');
+  void _loadTextScale() {
+    final saved = AppSettingsCache().get('text_scale');
     if (saved != null) {
       final parsed = double.tryParse(saved);
       if (parsed != null && mounted) {
@@ -105,9 +106,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _saveTextScale() async {
-    final persist = await _storageService.readRaw('persist_zoom');
+    final persist = AppSettingsCache().get('persist_zoom');
     if (persist != 'false') {
       await _storageService.writeRaw('text_scale', _textScale.toStringAsFixed(1));
+      AppSettingsCache().invalidate('text_scale');
     }
   }
 
@@ -115,8 +117,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final db = await DatabaseHelper.instance.database;
     final ftsService = FtsService(database: db);
 
-    final apiKey = await _storageService.getApiKey();
-    final model = await _storageService.getDefaultModel();
+    final cache = AppSettingsCache();
+    final apiKey = cache.get('anthropic_api_key');
+    final model = cache.get('default_model');
 
     if (model != null) {
       _selectedModel = model;
@@ -687,7 +690,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessageInternal(String text, {ImageAttachment? image}) async {
     if (_activeConversationId == null || _chatController == null) return;
 
-    final apiKey = await _storageService.getApiKey();
+    final apiKey = AppSettingsCache().get('anthropic_api_key');
     if (apiKey == null || apiKey.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1171,8 +1174,8 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             onPressed: () async {
               await Navigator.pushNamed(context, AppRoutes.settings);
-              // Recarrega modelo ao voltar de Settings
-              final savedModel = await _storageService.getDefaultModel();
+              // Recarrega modelo ao voltar de Settings (pode ter sido alterado)
+              final savedModel = await SecureStorageService().getDefaultModel();
               if (savedModel != null && savedModel != _selectedModel && mounted) {
                 setState(() => _selectedModel = savedModel);
                 _updateGenerationService(savedModel);
@@ -1288,7 +1291,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _updateKimiService() async {
-    final kimiKey = await SecureStorageService().getKimiApiKey();
+    final cache = AppSettingsCache();
+    final kimiKey = cache.get('kimi_api_key');
     if (kimiKey == null || kimiKey.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1305,7 +1309,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     // Aviso de API externa (primeira vez)
-    final dismissed = await SecureStorageService().readRaw(StorageKeys.kimiWarningDismissed);
+    final dismissed = cache.get(StorageKeys.kimiWarningDismissed);
     if (dismissed != 'true' && mounted) {
       final accepted = await showDialog<bool>(
         context: context,

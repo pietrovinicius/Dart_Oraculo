@@ -6,6 +6,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/image_attachment.dart';
 import '../../core/services/anthropic_service.dart';
+import '../../core/services/app_settings_cache.dart';
 import '../../core/services/fidelity_checker.dart';
 import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
@@ -149,7 +150,7 @@ class ChatController extends ChangeNotifier {
         '(coleção=${collectionId ?? "todas"})');
 
     // 1. Reformula query (LLM) + Busca chunks via FTS5
-    final chunksStr = await _secureStorage.readRaw('max_chunks_per_query');
+    final chunksStr = AppSettingsCache().get('max_chunks_per_query');
     final maxChunks = int.tryParse(chunksStr ?? '') ?? AppConfig.maxChunksPerQuery;
 
     // 1a. Reformulação inteligente da query (timeout 2s, fallback para original)
@@ -187,7 +188,7 @@ class ChatController extends ChangeNotifier {
 
     // 2. Monta contexto a partir dos chunks recuperados
     //    Trunca chunks grandes conforme user setting (chunk_max_tokens × 4 chars).
-    final chunkTokensSetting = await _secureStorage.readRaw('chunk_max_tokens');
+    final chunkTokensSetting = AppSettingsCache().get('chunk_max_tokens');
     final userMaxChars = (int.tryParse(chunkTokensSetting ?? '') ?? AppConfig.chunkMaxTokens) * 4;
     final maxChars = userMaxChars.clamp(400, activeGenerationService.maxContextCharsPerChunk);
     final contextBuffer = StringBuffer();
@@ -258,7 +259,7 @@ class ChatController extends ChangeNotifier {
     // 2c. Lê toggle global de conhecimento geral (Settings)
     bool allowGeneralKnowledge = false;
     // bool webEnabled = false; // WEB_SEARCH_DISABLED
-    final gkSetting = await _secureStorage.readRaw('general_knowledge_enabled');
+    final gkSetting = AppSettingsCache().get('general_knowledge_enabled');
     allowGeneralKnowledge = gkSetting == 'true';
 
     // --- WEB_SEARCH_DISABLED: Busca na internet removida — não é conceito do app ---
@@ -299,7 +300,7 @@ class ChatController extends ChangeNotifier {
         'docs trabalho: ${attachments.length}, web: $usedWebSearch)');
 
     // 3. Recupera histórico recente da conversa
-    final histStr = await _secureStorage.readRaw('max_history_messages');
+    final histStr = AppSettingsCache().get('max_history_messages');
     final maxHistory = int.tryParse(histStr ?? '') ?? AppConfig.maxHistoryMessages;
     final allMessages = await getMessages(conversationId);
     final recentMessages = allMessages.length > maxHistory
@@ -465,7 +466,7 @@ class ChatController extends ChangeNotifier {
     }
 
     // Verifica toggle global de fidelidade (Settings)
-    final verifySetting = await _secureStorage.readRaw('verify_before_promote_enabled');
+    final verifySetting = AppSettingsCache().get('verify_before_promote_enabled');
     if (verifySetting == 'false') {
       LoggerService.instance.info(_tag, 'Skip checagem (toggle desligado em Settings)');
       await _promoteAnswer(messageId);
