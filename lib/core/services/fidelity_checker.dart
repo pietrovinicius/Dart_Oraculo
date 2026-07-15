@@ -7,10 +7,18 @@ import 'logger_service.dart';
 
 /// Resultado da checagem de fidelidade.
 class FidelityCheckResult {
-  const FidelityCheckResult({required this.isGrounded, this.ungroundedClaims});
+  const FidelityCheckResult({
+    required this.isGrounded,
+    this.ungroundedClaims,
+    this.reason,
+  });
 
   final bool isGrounded;
   final List<String>? ungroundedClaims;
+
+  /// Explica o resultado — útil quando o check falha/indisponível para o caller
+  /// decidir entre bloquear promoção ou pedir confirmação ao usuário.
+  final String? reason;
 }
 
 /// Verifica se uma resposta está fundamentada nos chunks usados.
@@ -80,14 +88,20 @@ class FidelityChecker {
       if (response.statusCode != 200) {
         LoggerService.instance.error(_tag,
             'Verificador retornou ${response.statusCode}: ${response.body}');
-        // Em caso de erro, não bloqueia promoção
-        return const FidelityCheckResult(isGrounded: true);
+        // CONSERVADOR: HTTP não-200 = não verificável. Nunca bypasse safety check.
+        return const FidelityCheckResult(
+          isGrounded: false,
+          reason: 'Verificador retornou status HTTP não-ok.',
+        );
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       final content = json['content'] as List?;
       if (content == null || content.isEmpty) {
-        return const FidelityCheckResult(isGrounded: true);
+        return const FidelityCheckResult(
+          isGrounded: false,
+          reason: 'Resposta do verificador vazia.',
+        );
       }
 
       final text = content.first['text'] as String? ?? '';
@@ -96,7 +110,10 @@ class FidelityChecker {
       // Parse JSON da resposta
       final resultJson = _extractJson(text);
       if (resultJson == null) {
-        return const FidelityCheckResult(isGrounded: true);
+        return const FidelityCheckResult(
+          isGrounded: false,
+          reason: 'Resposta do verificador não pôde ser interpretada.',
+        );
       }
 
       final grounded = resultJson['grounded'] as bool? ?? true;
@@ -108,8 +125,12 @@ class FidelityChecker {
       );
     } catch (e) {
       LoggerService.instance.error(_tag, 'Erro na checagem de fidelidade', e);
-      // Em caso de erro, não bloqueia promoção
-      return const FidelityCheckResult(isGrounded: true);
+      // CONSERVADOR: em caso de erro, marca como NÃO fundamentado.
+      // Nunca bypasse safety check — melhor falso negativo que falso positivo.
+      return const FidelityCheckResult(
+        isGrounded: false,
+        reason: 'Verificação de fidelidade indisponível. Resposta não verificada.',
+      );
     }
   }
 

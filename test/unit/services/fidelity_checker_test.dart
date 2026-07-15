@@ -72,7 +72,9 @@ void main() {
       expect(result.ungroundedClaims, contains('ADEP_V foi criada em 2020'));
     });
 
-    test('retorna grounded=true em caso de erro HTTP (não bloqueia)', () async {
+    test(
+        'retorna conservador (grounded=false) em erro HTTP 500 — nunca bypasse safety',
+        () async {
       final mockClient = MockClient((request) async {
         return http.Response('Internal Server Error', 500);
       });
@@ -92,7 +94,34 @@ void main() {
         verifierModel: 'claude-opus-4-8',
       );
 
-      expect(result.isGrounded, isTrue);
+      expect(result.isGrounded, isFalse);
+      expect(result.reason, isNotNull);
+    });
+
+    test(
+        'retorna conservador (grounded=false) em exceção de rede — nunca bypasse safety',
+        () async {
+      final mockClient = MockClient((request) async {
+        throw Exception('Network unavailable');
+      });
+
+      final checker = FidelityChecker(
+        headers: {
+          'x-api-key': 'sk-test-123456789',
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        httpClient: mockClient,
+      );
+
+      final result = await checker.check(
+        answerText: 'qualquer coisa',
+        chunksContext: 'contexto',
+        verifierModel: 'claude-opus-4-8',
+      );
+
+      expect(result.isGrounded, isFalse);
+      expect(result.reason, isNotNull);
     });
 
     test('envia cache_control ephemeral no system', () async {
