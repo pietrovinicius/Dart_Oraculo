@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/database/database_helper.dart';
+import '../../core/services/app_settings_cache.dart';
+import '../../core/services/chunking_service.dart';
 import '../../core/services/logger_service.dart';
+import '../../core/services/pdf_service.dart';
 import '../../core/services/secure_storage_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/theme_notifier.dart';
+import '../documents/document_service.dart';
 import 'settings_controller.dart';
 
 /// Tela de configurações — chave API, modelo padrão, toggle biometria, tema.
@@ -34,9 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = SettingsController(
-      storageService: SecureStorageService(),
-    );
+    _controller = SettingsController();
     _controller.addListener(_onControllerChanged);
     _controller.load();
     _loadZoomPref();
@@ -61,7 +64,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadKimiKey() async {
-    final key = await SecureStorageService().getKimiApiKey();
+    // Lê do cache, não do Keychain
+    final key = AppSettingsCache().get('kimi_api_key');
     if (key != null && key.isNotEmpty && mounted) {
       setState(() => _kimiKeyController.text = _maskApiKey(key));
     }
@@ -113,6 +117,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildBiometricSection(),
                   const SizedBox(height: 32),
                   _buildAdvancedSection(),
+                  const SizedBox(height: 32),
+                  _buildMaintenanceSection(),
                 ],
               ),
             ),
@@ -280,6 +286,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     try {
       await SecureStorageService().setKimiApiKey(key);
+      AppSettingsCache().invalidate('kimi_api_key');
       if (mounted) {
         setState(() {}); // Atualiza indicador
         ScaffoldMessenger.of(context).showSnackBar(
@@ -414,10 +421,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  final _storage = SecureStorageService();
-
   Future<void> _loadGeneralKnowledge() async {
-    final saved = await _storage.readRaw('general_knowledge_enabled');
+    final saved = AppSettingsCache().get('general_knowledge_enabled');
     if (mounted) {
       setState(() => _generalKnowledge = saved == 'true');
     }
@@ -443,7 +448,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           activeColor: AppColors.accentOrange,
           onChanged: (v) async {
             setState(() => _generalKnowledge = v);
-            await _storage.writeRaw('general_knowledge_enabled', v.toString());
+            await SecureStorageService().writeRaw('general_knowledge_enabled', v.toString());
+            AppSettingsCache().invalidate('general_knowledge_enabled');
           },
         ),
       ],
@@ -451,7 +457,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadFidelity() async {
-    final saved = await _storage.readRaw('verify_before_promote_enabled');
+    final saved = AppSettingsCache().get('verify_before_promote_enabled');
     if (mounted) {
       setState(() => _verifyFidelity = saved != 'false');
     }
@@ -477,7 +483,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           activeColor: AppColors.accentOrange,
           onChanged: (v) async {
             setState(() => _verifyFidelity = v);
-            await _storage.writeRaw('verify_before_promote_enabled', v.toString());
+            await SecureStorageService().writeRaw('verify_before_promote_enabled', v.toString());
+            AppSettingsCache().invalidate('verify_before_promote_enabled');
           },
         ),
       ],
@@ -485,7 +492,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadZoomPref() async {
-    final saved = await _storage.readRaw('persist_zoom');
+    final saved = AppSettingsCache().get('persist_zoom');
     if (mounted) {
       setState(() => _persistZoom = saved != 'false');
     }
@@ -510,10 +517,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           activeThumbColor: AppColors.accentOrange,
           onChanged: (value) async {
             setState(() => _persistZoom = value);
-            await _storage.writeRaw('persist_zoom', value.toString());
+            await SecureStorageService().writeRaw('persist_zoom', value.toString());
+            AppSettingsCache().invalidate('persist_zoom');
             if (!value) {
               // Remove zoom salvo para resetar na próxima abertura
-              await _storage.writeRaw('text_scale', '1.0');
+              await SecureStorageService().writeRaw('text_scale', '1.0');
+              AppSettingsCache().invalidate('text_scale');
             }
           },
         ),
@@ -591,9 +600,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // --- FIM WEB_SEARCH_DISABLED ---
 
   Future<void> _loadAdvancedSettings() async {
-    final histStr = await _storage.readRaw('max_history_messages');
-    final chunksStr = await _storage.readRaw('max_chunks_per_query');
-    final chunkSizeStr = await _storage.readRaw('chunk_max_tokens');
+    final cache = AppSettingsCache();
+    final histStr = cache.get('max_history_messages');
+    final chunksStr = cache.get('max_chunks_per_query');
+    final chunkSizeStr = cache.get('chunk_max_tokens');
     if (mounted) {
       setState(() {
         _maxHistoryMessages = double.tryParse(histStr ?? '') ?? 10;
@@ -677,10 +687,107 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged(v);
           },
           onChangeEnd: (v) async {
-            await _storage.writeRaw(storageKey, '${v.round()}');
+            await SecureStorageService().writeRaw(storageKey, '${v.round()}');
+            AppSettingsCache().invalidate(storageKey);
           },
         ),
       ],
     );
+  }
+
+  Widget _buildMaintenanceSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Manutenção', style: AppTextStyles.bodyLarge),
+        const SizedBox(height: 4),
+        const Text(
+          'Ferramentas para diagnosticar e corrigir problemas de indexação.',
+          style: AppTextStyles.bodySmall,
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.refresh),
+          label: const Text('Re-indexar Collection 2'),
+          onPressed: () => _showReindexConfirm(),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accentOrange,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Limpa e reimporta todos os documentos da collection 2. Use se as buscas retornarem 0 resultados.',
+          style: AppTextStyles.bodySmall,
+        ),
+      ],
+    );
+  }
+
+  void _showReindexConfirm() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Re-indexar Collection 2?'),
+        content: const Text(
+          'Isso vai limpar e reimportar todos os documentos da collection 2. '
+          'Pode levar alguns minutos.\n\n'
+          'Os arquivos originais precisam estar acessíveis no disco.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _reindexCollection2();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accentOrange,
+            ),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _reindexCollection2() async {
+    try {
+      final db = await DatabaseHelper.instance.database;
+      final docService = DocumentService(
+        database: db,
+        pdfService: PdfService(),
+        chunkingService: ChunkingService(),
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Re-indexação iniciada. Verifique os logs...'),
+          backgroundColor: AppColors.accentOrange,
+        ),
+      );
+
+      await docService.reindexCollection2();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Re-indexação concluída!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      LoggerService.instance.error('SettingsScreen', 'Erro na re-indexação: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }

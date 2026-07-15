@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'core/config/app_routes.dart';
-import 'core/services/secure_storage_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_notifier.dart';
 import 'features/auth/lock_screen.dart';
@@ -21,7 +20,7 @@ class _DartOraculoAppState extends State<DartOraculoApp> {
   @override
   void initState() {
     super.initState();
-    _themeNotifier = ThemeNotifier(storage: SecureStorageService());
+    _themeNotifier = ThemeNotifier();
     _themeNotifier.load();
   }
 
