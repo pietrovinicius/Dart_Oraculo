@@ -1,5 +1,6 @@
 import 'package:dart_oraculo/core/services/secure_storage_service.dart';
 import 'package:dart_oraculo/features/auth/auth_service.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:local_auth/local_auth.dart';
@@ -10,6 +11,7 @@ class FakeLocalAuth extends Fake implements LocalAuthentication {
   bool canCheckBiometricsValue = true;
   bool isDeviceSupportedValue = true;
   bool authenticateResult = true;
+  Object? authenticateThrow;
 
   @override
   Future<bool> get canCheckBiometrics async => canCheckBiometricsValue;
@@ -23,7 +25,10 @@ class FakeLocalAuth extends Fake implements LocalAuthentication {
     // ignore: always_specify_types
     dynamic authMessages = const [],
     AuthenticationOptions options = const AuthenticationOptions(),
-  }) async => authenticateResult;
+  }) async {
+    if (authenticateThrow != null) throw authenticateThrow!;
+    return authenticateResult;
+  }
 
   @override
   Future<List<BiometricType>> getAvailableBiometrics() async =>
@@ -140,21 +145,23 @@ void main() {
       expect(await authService.isBiometricAvailable(), isFalse);
     });
 
-    test('authenticate retorna notConfigured quando biometria desabilitada',
+    test('authenticate retorna failed quando biometria desabilitada',
         () async {
       // biometric_enabled não foi setado → default false
       final result = await authService.authenticate();
-      expect(result, equals(AuthResult.notConfigured));
+      expect(result.success, isFalse);
+      expect(result.message, isNotNull);
     });
 
-    test('authenticate retorna notAvailable quando dispositivo não suporta',
+    test('authenticate retorna failed quando dispositivo não suporta',
         () async {
       await storageService.setBiometricEnabled(true);
       fakeLocalAuth.canCheckBiometricsValue = false;
       fakeLocalAuth.isDeviceSupportedValue = false;
 
       final result = await authService.authenticate();
-      expect(result, equals(AuthResult.notAvailable));
+      expect(result.success, isFalse);
+      expect(result.message, isNotNull);
     });
 
     test('authenticate retorna success quando biometria passa', () async {
@@ -162,7 +169,7 @@ void main() {
       fakeLocalAuth.authenticateResult = true;
 
       final result = await authService.authenticate();
-      expect(result, equals(AuthResult.success));
+      expect(result.success, isTrue);
     });
 
     test('authenticate retorna failed quando biometria falha', () async {
@@ -170,13 +177,105 @@ void main() {
       fakeLocalAuth.authenticateResult = false;
 
       final result = await authService.authenticate();
-      expect(result, equals(AuthResult.failed));
+      expect(result.success, isFalse);
+      expect(result.message, isNotNull);
     });
 
     test('isBiometricRequired lê do storage', () async {
       expect(await authService.isBiometricRequired(), isFalse);
       await storageService.setBiometricEnabled(true);
       expect(await authService.isBiometricRequired(), isTrue);
+    });
+
+    test(
+        'authenticate retorna failed com mensagem em PlatformException LockedOut',
+        () async {
+      await storageService.setBiometricEnabled(true);
+      fakeLocalAuth.authenticateThrow =
+          PlatformException(code: 'LockedOut', message: 'Too many attempts');
+
+      final result = await authService.authenticate();
+
+      expect(result.success, isFalse);
+      expect(result.message, isNotNull);
+      expect(result.message, contains('Muitas tentativas'));
+    });
+
+    test('authenticate retorna failed com mensagem em PlatformException '
+        'NotAvailable', () async {
+      await storageService.setBiometricEnabled(true);
+      fakeLocalAuth.authenticateThrow =
+          PlatformException(code: 'NotAvailable', message: 'no hw');
+
+      final result = await authService.authenticate();
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('não disponível'));
+    });
+
+    test('authenticate retorna failed com mensagem em PlatformException '
+        'NotEnrolled', () async {
+      await storageService.setBiometricEnabled(true);
+      fakeLocalAuth.authenticateThrow =
+          PlatformException(code: 'NotEnrolled', message: 'no biometrics');
+
+      final result = await authService.authenticate();
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('Nenhuma biometria'));
+    });
+
+    test('authenticate retorna failed com mensagem em PlatformException '
+        'UserCanceled', () async {
+      await storageService.setBiometricEnabled(true);
+      fakeLocalAuth.authenticateThrow =
+          PlatformException(code: 'UserCanceled', message: 'user cancel');
+
+      final result = await authService.authenticate();
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('cancelada'));
+    });
+
+    test('authenticate retorna ok() quando biometria passa', () async {
+      await storageService.setBiometricEnabled(true);
+      fakeLocalAuth.authenticateResult = true;
+
+      final result = await authService.authenticate();
+
+      expect(result.success, isTrue);
+      expect(result.message, isNull);
+    });
+
+    test('authenticate retorna failed com mensagem quando biometria '
+        'retorna false', () async {
+      await storageService.setBiometricEnabled(true);
+      fakeLocalAuth.authenticateResult = false;
+
+      final result = await authService.authenticate();
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('cancelada'));
+    });
+
+    test('authenticate retorna failed com mensagem quando biometria não '
+        'habilitada no storage', () async {
+      final result = await authService.authenticate();
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('não habilitada'));
+    });
+
+    test('authenticate retorna failed com mensagem quando biometria não '
+        'disponível no dispositivo', () async {
+      await storageService.setBiometricEnabled(true);
+      fakeLocalAuth.canCheckBiometricsValue = false;
+      fakeLocalAuth.isDeviceSupportedValue = false;
+
+      final result = await authService.authenticate();
+
+      expect(result.success, isFalse);
+      expect(result.message, contains('não disponível'));
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/config/app_routes.dart';
+import '../../core/services/error_feedback_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import 'auth_service.dart';
@@ -50,24 +51,18 @@ class _LockScreenState extends State<LockScreen> {
 
     if (!mounted) return;
 
-    switch (result) {
-      case AuthResult.success:
-        _navigateHome();
-      case AuthResult.notConfigured:
-        setState(() {
-          _authenticating = false;
-          _errorMessage = 'Biometria não configurada neste dispositivo. Configure o Touch ID nas preferências do sistema.';
-        });
-      case AuthResult.notAvailable:
-        setState(() {
-          _authenticating = false;
-          _errorMessage = 'Autenticação biométrica não disponível neste dispositivo.';
-        });
-      case AuthResult.failed:
-        setState(() {
-          _authenticating = false;
-          _errorMessage = 'Autenticação falhou. Tente novamente.';
-        });
+    if (result.success) {
+      _navigateHome();
+    } else {
+      setState(() {
+        _authenticating = false;
+        _errorMessage = result.message ?? 'Erro desconhecido';
+      });
+      ErrorFeedbackService.showError(
+        context,
+        'Autenticação falhou',
+        result.message ?? 'Erro desconhecido',
+      );
     }
   }
 

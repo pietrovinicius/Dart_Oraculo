@@ -1,15 +1,11 @@
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../core/models/auth_result.dart';
 import '../../core/services/logger_service.dart';
 import '../../core/services/secure_storage_service.dart';
 
-/// Resultado da tentativa de autenticação.
-enum AuthResult {
-  success,
-  failed,
-  notAvailable,
-  notConfigured,
-}
+export '../../core/models/auth_result.dart';
 
 /// Serviço de autenticação local via biometria ou senha do sistema.
 class AuthService {
@@ -26,7 +22,10 @@ class AuthService {
   Future<bool> isBiometricAvailable() async {
     final canCheck = await _localAuth.canCheckBiometrics;
     final isSupported = await _localAuth.isDeviceSupported();
-    LoggerService.instance.info(_tag, 'canCheckBiometrics=$canCheck, isDeviceSupported=$isSupported');
+    LoggerService.instance.info(
+      _tag,
+      'canCheckBiometrics=$canCheck, isDeviceSupported=$isSupported',
+    );
     return canCheck || isSupported;
   }
 
@@ -38,14 +37,21 @@ class AuthService {
 
     final isRequired = await _storageService.isBiometricEnabled();
     if (!isRequired) {
-      LoggerService.instance.info(_tag, 'Biometria não habilitada → notConfigured');
-      return AuthResult.notConfigured;
+      LoggerService.instance.info(_tag, 'Biometria não habilitada');
+      return AuthResult.failed(
+        'Biometria não habilitada. Configure em Configurações.',
+      );
     }
 
     final isAvailable = await isBiometricAvailable();
     if (!isAvailable) {
-      LoggerService.instance.warn(_tag, 'Biometria não disponível no dispositivo');
-      return AuthResult.notAvailable;
+      LoggerService.instance.warn(
+        _tag,
+        'Biometria não disponível no dispositivo',
+      );
+      return AuthResult.failed(
+        'Biometria não disponível neste dispositivo.',
+      );
     }
 
     try {
@@ -56,12 +62,27 @@ class AuthService {
           biometricOnly: false,
         ),
       );
-      final result = didAuth ? AuthResult.success : AuthResult.failed;
-      LoggerService.instance.info(_tag, 'authenticate result=$result');
-      return result;
-    } catch (e, stack) {
-      LoggerService.instance.error(_tag, 'Erro na autenticação', e, stack);
-      return AuthResult.failed;
+      if (didAuth) {
+        LoggerService.instance.info(_tag, 'Autenticação bem-sucedida');
+        return AuthResult.ok();
+      } else {
+        LoggerService.instance.info(_tag, 'Usuário cancelou autenticação');
+        return AuthResult.failed('Autenticação cancelada.');
+      }
+    } on PlatformException catch (e) {
+      LoggerService.instance.error(
+        _tag,
+        'PlatformException na autenticação: ${e.code}',
+        e,
+      );
+      return AuthResult.fromException(e);
+    } catch (e) {
+      LoggerService.instance.error(
+        _tag,
+        'Erro desconhecido na autenticação',
+        e,
+      );
+      return AuthResult.failed('Erro desconhecido na autenticação: $e');
     }
   }
 }
