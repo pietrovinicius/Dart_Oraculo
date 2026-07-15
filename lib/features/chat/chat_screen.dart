@@ -20,6 +20,7 @@ import '../../core/services/fts_service.dart';
 import '../../core/services/generation_service.dart';
 import '../../core/services/image_resize_service.dart';
 import '../../core/services/kimi_service.dart';
+import '../../core/services/logger_service.dart';
 import '../../core/services/ollama_service.dart';
 import '../../core/services/pdf_service.dart';
 import '../../core/services/app_settings_cache.dart';
@@ -34,6 +35,7 @@ import '../documents/library_screen.dart';
 import 'chat_controller.dart';
 import 'models/conversation.dart';
 import 'models/message.dart';
+import 'utils/citation_dedup.dart';
 import 'widgets/chat_input.dart';
 import 'widgets/citation_strip.dart';
 import 'widgets/message_bubble.dart';
@@ -920,18 +922,17 @@ class _ChatScreenState extends State<ChatScreen> {
       final all = ids
           .map((id) => _citationCache[id as int] ?? CitationData(filename: 'doc #$id'))
           .toList();
-      // Deduplicar por filename+page
-      final seen = <String>{};
-      final deduped = <CitationData>[];
-      for (final c in all) {
-        final key = '${c.filename}_${c.page}_${c.sourceType}';
-        if (!seen.contains(key)) {
-          seen.add(key);
-          deduped.add(c);
-        }
-      }
-      return deduped;
-    } catch (_) {
+      // Deduplicar por filename+page+sourceType via utilitário testado.
+      // Em caso de falha no dedup, o utilitário retorna `all` intacto
+      // (nunca []) — usuário preserva as fontes brutas.
+      return dedupeCitations(all);
+    } catch (e, stack) {
+      LoggerService.instance.error(
+        'chat_screen',
+        'Falha ao parsear chunksUsed — sem citações nesta mensagem',
+        e,
+        stack,
+      );
       return [];
     }
   }
