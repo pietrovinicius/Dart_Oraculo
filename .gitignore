@@ -41,3 +41,10 @@ coverage/
 
 # Misc
 *.log
+
+# Artefatos locais / análise
+.superpowers/
+graphify-out/
+csv/
+dicionario_tasy/
+sql/
