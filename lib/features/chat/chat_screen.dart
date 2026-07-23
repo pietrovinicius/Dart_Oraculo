@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:typed_data';
@@ -8,24 +9,24 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/config/app_routes.dart';
+import '../../core/constants/storage_keys.dart';
 import '../../core/database/database_helper.dart';
 import '../../core/models/image_attachment.dart';
 import '../../core/services/anthropic_service.dart';
+import '../../core/services/app_settings_cache.dart';
 import '../../core/services/chunking_service.dart';
 import '../../core/services/fts_service.dart';
-import '../../core/services/generation_service.dart';
 import '../../core/services/image_resize_service.dart';
 import '../../core/services/kimi_service.dart';
 import '../../core/services/logger_service.dart';
 import '../../core/services/ollama_service.dart';
 import '../../core/services/pdf_service.dart';
-import '../../core/services/app_settings_cache.dart';
 import '../../core/services/secure_storage_service.dart';
-import '../../core/constants/storage_keys.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../collections/collection_service.dart';
@@ -33,6 +34,7 @@ import '../collections/models/collection.dart';
 import '../documents/document_service.dart';
 import '../documents/library_screen.dart';
 import 'chat_controller.dart';
+import 'chat_description_generation_service_resolver.dart';
 import 'models/conversation.dart';
 import 'models/message.dart';
 import 'utils/citation_dedup.dart';
@@ -46,7 +48,8 @@ import 'widgets/sidebar.dart';
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, this.themeNotifier});
 
-  final dynamic themeNotifier; // ThemeNotifier (optional, for passing to settings)
+  final dynamic
+      themeNotifier; // ThemeNotifier (optional, for passing to settings)
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -110,7 +113,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _saveTextScale() async {
     final persist = AppSettingsCache().get('persist_zoom');
     if (persist != 'false') {
-      await _storageService.writeRaw('text_scale', _textScale.toStringAsFixed(1));
+      await _storageService.writeRaw(
+          'text_scale', _textScale.toStringAsFixed(1));
       AppSettingsCache().invalidate('text_scale');
     }
   }
@@ -138,23 +142,9 @@ class _ChatScreenState extends State<ChatScreen> {
       ftsService: ftsService,
     );
 
-    // Resolve GenerationService para geração de descrição
-    GenerationService? descriptionService;
-    if (_selectedModel == AppConfig.modelQwen) {
-      descriptionService = OllamaService();
-    } else if (apiKey != null && apiKey.isNotEmpty) {
-      descriptionService = anthropicService;
-    }
-
-    _documentService = DocumentService(
+    _documentService = _buildDocumentService(
       database: db,
-      pdfService: PdfService(),
-      chunkingService: ChunkingService(maxTokensPerChunk: _chunkMaxTokens),
-      anthropicService: apiKey != null && apiKey.isNotEmpty
-          ? anthropicService
-          : null,
-      generationService: descriptionService,
-      defaultModel: _selectedModel,
+      anthropicService: anthropicService,
     );
 
     _collectionService = CollectionService(database: db);
@@ -222,7 +212,8 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Criar', style: TextStyle(color: AppColors.accentOrange)),
+            child: const Text('Criar',
+                style: TextStyle(color: AppColors.accentOrange)),
           ),
         ],
       ),
@@ -241,7 +232,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final db = _chatController?.database;
     if (db == null) return;
 
-    final rows = await db.query('collections', where: 'id = ?', whereArgs: [_activeCollectionId]);
+    final rows = await db.query('collections',
+        where: 'id = ?', whereArgs: [_activeCollectionId]);
     if (rows.isEmpty) return;
 
     // Todos os toggles migrados para Settings global (v0.24.0+)
@@ -252,26 +244,27 @@ class _ChatScreenState extends State<ChatScreen> {
     await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          title: Text(
-            'Configurações — ${_activeCollection?.name ?? ""}',
-            style: AppTextStyles.bodyLarge,
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Toggles de comportamento foram movidos para Configurações (menu principal).',
-                style: AppTextStyles.bodySmall,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Fechar', style: TextStyle(color: AppColors.accentOrange)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(
+          'Configurações — ${_activeCollection?.name ?? ""}',
+          style: AppTextStyles.bodyLarge,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Toggles de comportamento foram movidos para Configurações (menu principal).',
+              style: AppTextStyles.bodySmall,
             ),
           ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Fechar',
+                style: TextStyle(color: AppColors.accentOrange)),
+          ),
+        ],
       ),
     );
   }
@@ -300,7 +293,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadMessages(int conversationId) async {
     final msgs = await _chatController?.getMessages(conversationId) ?? [];
-    final feedbacks = await _chatController?.getFeedbacksForConversation(conversationId) ?? {};
+    final feedbacks =
+        await _chatController?.getFeedbacksForConversation(conversationId) ??
+            {};
 
     // Carrega citações reais (chunk_id → filename, page)
     await _loadCitationCache(msgs);
@@ -431,9 +426,11 @@ class _ChatScreenState extends State<ChatScreen> {
       // Busca título para nome do arquivo
       final conv = _conversations.where((c) => c.id == id).firstOrNull;
       final title = conv?.title ?? 'conversa';
-      final safeTitle = title.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
+      final safeTitle =
+          title.replaceAll(RegExp(r'[^\w\s-]'), '').replaceAll(' ', '_');
       final now = DateTime.now();
-      final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final dateStr =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final filename = '${safeTitle}_$dateStr.md';
 
       // Salva via file picker
@@ -506,7 +503,8 @@ class _ChatScreenState extends State<ChatScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('Agrupar por qual coluna?', style: AppTextStyles.bodyLarge),
+        title: const Text('Agrupar por qual coluna?',
+            style: AppTextStyles.bodyLarge),
         content: SizedBox(
           width: 300,
           height: 400,
@@ -522,11 +520,13 @@ class _ChatScreenState extends State<ChatScreen> {
               Expanded(
                 child: ListView(
                   shrinkWrap: true,
-                  children: columns.map((col) => ListTile(
-                    title: Text(col, style: AppTextStyles.bodyMedium),
-                    dense: true,
-                    onTap: () => Navigator.pop(ctx, col),
-                  )).toList(),
+                  children: columns
+                      .map((col) => ListTile(
+                            title: Text(col, style: AppTextStyles.bodyMedium),
+                            dense: true,
+                            onTap: () => Navigator.pop(ctx, col),
+                          ))
+                      .toList(),
                 ),
               ),
             ],
@@ -567,7 +567,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Formato inválido: .$ext — aceito: JPG, PNG, GIF, WebP, MD, TXT'),
+            content: Text(
+                'Formato inválido: .$ext — aceito: JPG, PNG, GIF, WebP, MD, TXT'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -599,21 +600,26 @@ class _ChatScreenState extends State<ChatScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(filename, style: AppTextStyles.techMedium.copyWith(
-              color: AppColors.accentOrange)),
+            Text(filename,
+                style: AppTextStyles.techMedium
+                    .copyWith(color: AppColors.accentOrange)),
             const SizedBox(height: 16),
             ListTile(
               leading: const Text('📚', style: TextStyle(fontSize: 24)),
-              title: const Text('Adicionar à biblioteca', style: AppTextStyles.bodyMedium),
-              subtitle: const Text('Indexa permanentemente na coleção.\nDisponível em todas as conversas.',
+              title: const Text('Adicionar à biblioteca',
+                  style: AppTextStyles.bodyMedium),
+              subtitle: const Text(
+                  'Indexa permanentemente na coleção.\nDisponível em todas as conversas.',
                   style: AppTextStyles.techSmall),
               onTap: () => Navigator.pop(ctx, 'library'),
             ),
             Divider(color: Theme.of(context).dividerColor),
             ListTile(
               leading: const Text('📎', style: TextStyle(fontSize: 24)),
-              title: const Text('Usar nesta conversa', style: AppTextStyles.bodyMedium),
-              subtitle: const Text('Contexto de trabalho temporário.\nSó nesta conversa.',
+              title: const Text('Usar nesta conversa',
+                  style: AppTextStyles.bodyMedium),
+              subtitle: const Text(
+                  'Contexto de trabalho temporário.\nSó nesta conversa.',
                   style: AppTextStyles.techSmall),
               onTap: () => Navigator.pop(ctx, 'conversation'),
             ),
@@ -686,10 +692,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _sendMessageInternal(question, image: attachment);
   }
 
-  Future<void> _sendMessage(String text) =>
-      _sendMessageInternal(text);
+  Future<void> _sendMessage(String text) => _sendMessageInternal(text);
 
-  Future<void> _sendMessageInternal(String text, {ImageAttachment? image}) async {
+  Future<void> _sendMessageInternal(String text,
+      {ImageAttachment? image}) async {
     if (_activeConversationId == null || _chatController == null) return;
 
     final apiKey = AppSettingsCache().get('anthropic_api_key');
@@ -821,7 +827,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
       try {
         final bytes = file.bytes ?? await _readFileBytes(file.path!);
-        final isStructured = file.name.endsWith('.csv') || file.name.endsWith('.json');
+        final isStructured =
+            file.name.endsWith('.csv') || file.name.endsWith('.json');
 
         if (isStructured) {
           // Dialog para selecionar coluna de agrupamento
@@ -920,7 +927,8 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final ids = jsonDecode(message.chunksUsed!) as List;
       final all = ids
-          .map((id) => _citationCache[id as int] ?? CitationData(filename: 'doc #$id'))
+          .map((id) =>
+              _citationCache[id as int] ?? CitationData(filename: 'doc #$id'))
           .toList();
       // Deduplicar por filename+page+sourceType via utilitário testado.
       // Em caso de falha no dedup, o utilitário retorna `all` intacto
@@ -953,25 +961,27 @@ class _ChatScreenState extends State<ChatScreen> {
             width: showSidebar ? 260 : 0,
             clipBehavior: Clip.hardEdge,
             decoration: const BoxDecoration(),
-            child: showSidebar ? Sidebar(
-              collections: _collections,
-              activeCollectionId: _activeCollectionId,
-              onCollectionChanged: _onCollectionChanged,
-              onNewCollection: _createNewCollection,
-              conversations: _conversations,
-              selectedConversationId: _activeConversationId,
-              onConversationSelected: _loadMessages,
-              onNewConversation: _createNewConversation,
-              onDeleteConversation: _deleteConversation,
-              onRenameConversation: _renameConversation,
-              onTogglePin: _togglePin,
-              onExportConversation: _exportConversation,
-              documentCount: _documentCount,
-              onOpenDocuments: _importDocument,
-              onOpenLibrary: _openLibrary,
-              onCollectionSettings: _showCollectionSettings,
-              appVersion: _appVersion,
-            ) : const SizedBox.shrink(),
+            child: showSidebar
+                ? Sidebar(
+                    collections: _collections,
+                    activeCollectionId: _activeCollectionId,
+                    onCollectionChanged: _onCollectionChanged,
+                    onNewCollection: _createNewCollection,
+                    conversations: _conversations,
+                    selectedConversationId: _activeConversationId,
+                    onConversationSelected: _loadMessages,
+                    onNewConversation: _createNewConversation,
+                    onDeleteConversation: _deleteConversation,
+                    onRenameConversation: _renameConversation,
+                    onTogglePin: _togglePin,
+                    onExportConversation: _exportConversation,
+                    documentCount: _documentCount,
+                    onOpenDocuments: _importDocument,
+                    onOpenLibrary: _openLibrary,
+                    onCollectionSettings: _showCollectionSettings,
+                    appVersion: _appVersion,
+                  )
+                : const SizedBox.shrink(),
           ),
 
           // Divider
@@ -990,59 +1000,65 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Stack(
                 children: [
                   Column(
-              children: [
-                // Toolbar
-                _buildToolbar(),
+                    children: [
+                      // Toolbar
+                      _buildToolbar(),
 
-                // Barra de progresso de importação
-                if (_isImporting) _buildImportProgress(),
+                      // Barra de progresso de importação
+                      if (_isImporting) _buildImportProgress(),
 
-                // Mensagens
-                Expanded(
-                  child: MediaQuery(
-                    data: MediaQuery.of(context).copyWith(
-                      textScaler: TextScaler.linear(_textScale),
-                    ),
-                    child: _activeConversationId == null
-                      ? _buildEmptyState()
-                      : Stack(
-                          children: [
-                            NotificationListener<ScrollNotification>(
-                              onNotification: _handleScrollNotification,
-                              child: _buildMessageList(),
-                            ),
-                            if (_showScrollToBottom)
-                              Positioned(
-                                right: 16,
-                                bottom: 80,
-                                child: FloatingActionButton.small(
-                                  onPressed: _scrollToBottom,
-                                  backgroundColor: Theme.of(context).colorScheme.surface,
-                                  foregroundColor: AppColors.accentOrange,
-                                  elevation: 4,
-                                  child: const Icon(Icons.keyboard_arrow_down),
+                      // Mensagens
+                      Expanded(
+                        child: MediaQuery(
+                          data: MediaQuery.of(context).copyWith(
+                            textScaler: TextScaler.linear(_textScale),
+                          ),
+                          child: _activeConversationId == null
+                              ? _buildEmptyState()
+                              : Stack(
+                                  children: [
+                                    NotificationListener<ScrollNotification>(
+                                      onNotification: _handleScrollNotification,
+                                      child: _buildMessageList(),
+                                    ),
+                                    if (_showScrollToBottom)
+                                      Positioned(
+                                        right: 16,
+                                        bottom: 80,
+                                        child: FloatingActionButton.small(
+                                          onPressed: _scrollToBottom,
+                                          backgroundColor: Theme.of(context)
+                                              .colorScheme
+                                              .surface,
+                                          foregroundColor:
+                                              AppColors.accentOrange,
+                                          elevation: 4,
+                                          child: const Icon(
+                                              Icons.keyboard_arrow_down),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                              ),
-                          ],
                         ),
-                  ),
-                ),
+                      ),
 
-                // Input
-                ChatInput(
-                  onSend: _sendMessage,
-                  onSendWithImage: _sendMessageWithImage,
-                  enabled: !_isLoading && !_isImporting && _activeConversationId != null,
-                  isStreaming: _isStreaming,
-                  onStop: () => setState(() => _stopRequested = true),
-                  selectedModel: _selectedModel,
-                  onModelChanged: (model) {
-                    setState(() => _selectedModel = model);
-                    _updateGenerationService(model);
-                  },
-                ),
-              ],
-            ),
+                      // Input
+                      ChatInput(
+                        onSend: _sendMessage,
+                        onSendWithImage: _sendMessageWithImage,
+                        enabled: !_isLoading &&
+                            !_isImporting &&
+                            _activeConversationId != null,
+                        isStreaming: _isStreaming,
+                        onStop: () => setState(() => _stopRequested = true),
+                        selectedModel: _selectedModel,
+                        onModelChanged: (model) {
+                          setState(() => _selectedModel = model);
+                          _updateGenerationService(model);
+                        },
+                      ),
+                    ],
+                  ),
                   // Overlay visual durante drag (faixa inferior sutil)
                   if (_isDragOver)
                     Positioned(
@@ -1054,7 +1070,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.accentOrange.withValues(alpha: 0.08),
                           border: Border.all(
-                            color: AppColors.accentOrange.withValues(alpha: 0.5),
+                            color:
+                                AppColors.accentOrange.withValues(alpha: 0.5),
                             width: 2,
                           ),
                           borderRadius: const BorderRadius.vertical(
@@ -1066,11 +1083,12 @@ class _ChatScreenState extends State<ChatScreen> {
                           children: [
                             Icon(Icons.image_outlined,
                                 size: 32,
-                                color: AppColors.accentOrange.withValues(alpha: 0.7)),
+                                color: AppColors.accentOrange
+                                    .withValues(alpha: 0.7)),
                             const SizedBox(width: 12),
                             Text('Solte a imagem, .md ou .txt aqui',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: AppColors.accentOrange)),
+                                style: AppTextStyles.bodyMedium
+                                    .copyWith(color: AppColors.accentOrange)),
                           ],
                         ),
                       ),
@@ -1090,7 +1108,8 @@ class _ChatScreenState extends State<ChatScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
+        border:
+            Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: Row(
         children: [
@@ -1104,7 +1123,8 @@ class _ChatScreenState extends State<ChatScreen> {
           // Indicador de docs de trabalho
           if (_activeConversationId != null)
             FutureBuilder<List<Map<String, dynamic>>>(
-              future: _chatController?.getContextAttachments(_activeConversationId!) ??
+              future: _chatController
+                      ?.getContextAttachments(_activeConversationId!) ??
                   Future.value([]),
               builder: (context, snapshot) {
                 final atts = snapshot.data ?? [];
@@ -1112,27 +1132,33 @@ class _ChatScreenState extends State<ChatScreen> {
                 return PopupMenuButton<int>(
                   tooltip: 'Documentos de trabalho',
                   child: Chip(
-                    avatar: const Icon(Icons.attach_file, size: 14,
-                        color: AppColors.accentOrange),
-                    label: Text('${atts.length} doc${atts.length > 1 ? 's' : ''}',
+                    avatar: const Icon(Icons.attach_file,
+                        size: 14, color: AppColors.accentOrange),
+                    label: Text(
+                        '${atts.length} doc${atts.length > 1 ? 's' : ''}',
                         style: AppTextStyles.techSmall),
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                     side: BorderSide(color: Theme.of(context).dividerColor),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  itemBuilder: (_) => atts.map((att) => PopupMenuItem<int>(
-                    value: att['id'] as int,
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(
-                          att['filename'] as String,
-                          style: AppTextStyles.bodySmall,
-                        )),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.close, size: 14, color: AppColors.error),
-                      ],
-                    ),
-                  )).toList(),
+                  itemBuilder: (_) => atts
+                      .map((att) => PopupMenuItem<int>(
+                            value: att['id'] as int,
+                            child: Row(
+                              children: [
+                                Expanded(
+                                    child: Text(
+                                  att['filename'] as String,
+                                  style: AppTextStyles.bodySmall,
+                                )),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.close,
+                                    size: 14, color: AppColors.error),
+                              ],
+                            ),
+                          ))
+                      .toList(),
                   onSelected: (attId) async {
                     await _chatController?.removeContextAttachment(attId);
                     if (mounted) setState(() {});
@@ -1143,8 +1169,10 @@ class _ChatScreenState extends State<ChatScreen> {
           const Spacer(),
           // Zoom controls
           IconButton(
-            icon: Icon(Icons.remove, size: 18,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+            icon: Icon(Icons.remove,
+                size: 18,
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             tooltip: 'Diminuir fonte',
             onPressed: () {
               setState(() => _textScale = (_textScale - 0.1).clamp(0.5, 2.0));
@@ -1160,8 +1188,10 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.add, size: 18,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
+            icon: Icon(Icons.add,
+                size: 18,
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
             tooltip: 'Aumentar fonte',
             onPressed: () {
               setState(() => _textScale = (_textScale + 0.1).clamp(0.5, 2.0));
@@ -1172,12 +1202,16 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 8),
           IconButton(
-            icon: Icon(Icons.settings, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+            icon: Icon(Icons.settings,
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
             onPressed: () async {
               await Navigator.pushNamed(context, AppRoutes.settings);
               // Recarrega modelo ao voltar de Settings (pode ter sido alterado)
               final savedModel = await SecureStorageService().getDefaultModel();
-              if (savedModel != null && savedModel != _selectedModel && mounted) {
+              if (savedModel != null &&
+                  savedModel != _selectedModel &&
+                  mounted) {
                 setState(() => _selectedModel = savedModel);
                 _updateGenerationService(savedModel);
               }
@@ -1279,15 +1313,51 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  DocumentService _buildDocumentService({
+    required Database database,
+    required AnthropicService anthropicService,
+  }) {
+    final cache = AppSettingsCache();
+    final apiKey = cache.get(StorageKeys.apiKey);
+    final descriptionService = ChatDescriptionGenerationServiceResolver.resolve(
+      selectedModel: _selectedModel,
+      anthropicService: anthropicService,
+      readSetting: cache.get,
+    );
+
+    return DocumentService(
+      database: database,
+      pdfService: PdfService(),
+      chunkingService: ChunkingService(maxTokensPerChunk: _chunkMaxTokens),
+      anthropicService:
+          apiKey != null && apiKey.isNotEmpty ? anthropicService : null,
+      generationService: descriptionService,
+      defaultModel: _selectedModel,
+    );
+  }
+
+  Future<void> _refreshDocumentServiceProvider() async {
+    final controller = _chatController;
+    if (controller == null) return;
+
+    _documentService = _buildDocumentService(
+      database: controller.database,
+      anthropicService: controller.anthropicService,
+    );
+  }
+
   void _updateGenerationService(String model) {
     if (_chatController == null) return;
     if (model == AppConfig.modelQwen) {
       _chatController!.activeGenerationService = OllamaService();
+      unawaited(_refreshDocumentServiceProvider());
     } else if (model == AppConfig.modelKimi) {
       _updateKimiService();
     } else {
       // Anthropic com o modelo selecionado
-      _chatController!.activeGenerationService = _chatController!.anthropicService;
+      _chatController!.activeGenerationService =
+          _chatController!.anthropicService;
+      unawaited(_refreshDocumentServiceProvider());
     }
   }
 
@@ -1304,7 +1374,9 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         // Reverte para Sonnet
         setState(() => _selectedModel = AppConfig.defaultModel);
-        _chatController!.activeGenerationService = _chatController!.anthropicService;
+        _chatController!.activeGenerationService =
+            _chatController!.anthropicService;
+        unawaited(_refreshDocumentServiceProvider());
       }
       return;
     }
@@ -1335,11 +1407,13 @@ class _ChatScreenState extends State<ChatScreen> {
             TextButton(
               onPressed: () async {
                 await SecureStorageService().writeRaw(
-                  StorageKeys.kimiWarningDismissed, 'true',
+                  StorageKeys.kimiWarningDismissed,
+                  'true',
                 );
                 Navigator.pop(context, true);
               },
-              style: TextButton.styleFrom(foregroundColor: AppColors.accentOrange),
+              style:
+                  TextButton.styleFrom(foregroundColor: AppColors.accentOrange),
               child: const Text('Entendi, continuar'),
             ),
           ],
@@ -1349,12 +1423,15 @@ class _ChatScreenState extends State<ChatScreen> {
       if (accepted != true) {
         // Usuário cancelou — reverte
         setState(() => _selectedModel = AppConfig.defaultModel);
-        _chatController!.activeGenerationService = _chatController!.anthropicService;
+        _chatController!.activeGenerationService =
+            _chatController!.anthropicService;
+        unawaited(_refreshDocumentServiceProvider());
         return;
       }
     }
 
     _chatController!.activeGenerationService = KimiService(apiKey: kimiKey);
+    unawaited(_refreshDocumentServiceProvider());
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -1392,8 +1469,10 @@ class _ChatScreenState extends State<ChatScreen> {
           const SizedBox(height: 6),
           LinearProgressIndicator(
             value: _importProgress,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-            valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentOrange),
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
+            valueColor:
+                const AlwaysStoppedAnimation<Color>(AppColors.accentOrange),
           ),
         ],
       ),
@@ -1451,7 +1530,8 @@ class _ChatScreenState extends State<ChatScreen> {
               isUser: isUser,
               modelUsed: isUser ? null : message.modelUsed,
               feedback: isUser ? null : _feedbacks[message.id],
-              isVerifying: !isUser && message.id != null &&
+              isVerifying: !isUser &&
+                  message.id != null &&
                   _feedbackInProgress.contains(message.id),
               onFeedbackChanged: (isUser || message.id == null)
                   ? null
@@ -1549,7 +1629,8 @@ class _ChatScreenState extends State<ChatScreen> {
               Text(
                 'Pensando... ${_formatElapsed(elapsed)}',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -1585,7 +1666,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (result != null && result.needsConfirmation && mounted) {
         final dialogMessage = result.confirmationMessage ??
             'Esta resposta contém afirmações que não foram encontradas '
-            'nos documentos consultados. Deseja promovê-la mesmo assim?';
+                'nos documentos consultados. Deseja promovê-la mesmo assim?';
         final confirmed = await showDialog<bool>(
           context: context,
           barrierDismissible: false,

@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dart_oraculo/core/config/app_config.dart';
 import 'package:dart_oraculo/core/database/migrations.dart';
 import 'package:dart_oraculo/core/services/anthropic_service.dart';
 import 'package:dart_oraculo/core/services/chunking_service.dart';
+import 'package:dart_oraculo/core/services/kimi_service.dart';
 import 'package:dart_oraculo/core/services/markdown_normalizer.dart';
 import 'package:dart_oraculo/core/services/pdf_service.dart';
 import 'package:dart_oraculo/features/documents/document_service.dart';
@@ -360,6 +362,45 @@ void main() {
 
       expect(modelUsed, equals('claude-opus-4-8'));
     });
+
+    test('usa Kimi quando KimiService é o GenerationService configurado',
+        () async {
+      String? modelUsed;
+      Uri? requestUri;
+      final mockClient = MockClient((request) async {
+        requestUri = request.url;
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        modelUsed = body['model'] as String?;
+        final responseBody = [
+          'data: {"choices":[{"delta":{"content":"Resumo Kimi."}}]}\n\n',
+          'data: [DONE]\n\n',
+        ].join();
+        return http.Response(responseBody, 200);
+      });
+
+      final kimi = KimiService(
+        apiKey: 'sk-kimi-test',
+        httpClient: mockClient,
+      );
+
+      final serviceWithAI = DocumentService(
+        database: db,
+        pdfService: PdfService(),
+        chunkingService: ChunkingService(),
+        generationService: kimi,
+      );
+
+      const content = 'Documento clínico para resumo via Kimi.';
+      final bytes = Uint8List.fromList(utf8.encode(content));
+      final doc = await serviceWithAI.ingestMarkdown(
+        bytes: bytes,
+        filename: 'kimi.md',
+      );
+
+      expect(requestUri.toString(), equals(AppConfig.kimiBaseUrl));
+      expect(modelUsed, equals(AppConfig.kimiModel));
+      expect(doc.description, equals('Resumo Kimi.'));
+    });
   });
 
   group('DocumentService — ingestStructuredData', () {
@@ -389,9 +430,21 @@ void main() {
 
     test('ingere JSON agrupado por coluna', () async {
       final jsonContent = jsonEncode([
-        {'TRIGGER_NAME': 'TRG_PACIENTE', 'TABLE_NAME': 'PACIENTE', 'STATUS': 'ENABLED'},
-        {'TRIGGER_NAME': 'TRG_PACIENTE', 'TABLE_NAME': 'PACIENTE', 'STATUS': 'ENABLED'},
-        {'TRIGGER_NAME': 'TRG_MEDICO', 'TABLE_NAME': 'MEDICO', 'STATUS': 'DISABLED'},
+        {
+          'TRIGGER_NAME': 'TRG_PACIENTE',
+          'TABLE_NAME': 'PACIENTE',
+          'STATUS': 'ENABLED'
+        },
+        {
+          'TRIGGER_NAME': 'TRG_PACIENTE',
+          'TABLE_NAME': 'PACIENTE',
+          'STATUS': 'ENABLED'
+        },
+        {
+          'TRIGGER_NAME': 'TRG_MEDICO',
+          'TABLE_NAME': 'MEDICO',
+          'STATUS': 'DISABLED'
+        },
       ]);
       final bytes = Uint8List.fromList(utf8.encode(jsonContent));
 
@@ -502,7 +555,8 @@ void main() {
   });
 
   group('DocumentService — batch inserts + isolate', () {
-    test('ingestStructuredData com volume grande usa batch (1500+ rows)', () async {
+    test('ingestStructuredData com volume grande usa batch (1500+ rows)',
+        () async {
       // Gera CSV sintético com 1500 rows (forçará pelo menos 2 batches de 1000)
       final buffer = StringBuffer();
       buffer.writeln('TABLE_NAME,COLUMN_NAME,DATA_TYPE');
